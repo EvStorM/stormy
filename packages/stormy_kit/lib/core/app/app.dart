@@ -26,24 +26,32 @@ class StormyApp extends HookWidget {
           light: StormyTheme.lightThemeData,
           dark: StormyTheme.darkThemeData,
           initial: StormyTheme.adaptiveThemeMode,
-          builder: (theme, darkTheme) => MaterialApp.router(
-            // Router 配置
-            routerConfig: router,
-            // Theme 配置
-            theme: theme,
-            darkTheme: darkTheme,
-            themeAnimationDuration: const Duration(milliseconds: 500),
-            themeAnimationCurve: Curves.easeInOut,
-            onGenerateTitle: (context) {
-              return appModel.title;
+          builder: (theme, darkTheme) => ValueListenableBuilder<Locale?>(
+            valueListenable: StormyI18n.localeNotifier,
+            builder: (context, currentLocale, child) {
+              return MaterialApp.router(
+                locale: currentLocale,
+                localizationsDelegates: StormyConfigAccessor.i18n?.localizationsDelegates,
+                supportedLocales: StormyConfigAccessor.i18n?.supportedLocales ?? const <Locale>[Locale('en', 'US')],
+                // Router 配置
+                routerConfig: router,
+                // Theme 配置
+                theme: theme,
+                darkTheme: darkTheme,
+                themeAnimationDuration: const Duration(milliseconds: 500),
+                themeAnimationCurve: Curves.easeInOut,
+                onGenerateTitle: (context) {
+                  return appModel.title;
+                },
+                // UI 配置
+                debugShowCheckedModeBanner: false,
+                // Smart Dialog 配置（会自动注入 navigatorObservers）
+                builder: FlutterSmartDialog.init(
+                  toastBuilder: appModel.toastBuilder,
+                  loadingBuilder: appModel.loadingBuilder,
+                ),
+              );
             },
-            // UI 配置
-            debugShowCheckedModeBanner: false,
-            // Smart Dialog 配置（会自动注入 navigatorObservers）
-            builder: FlutterSmartDialog.init(
-              toastBuilder: appModel.toastBuilder,
-              loadingBuilder: appModel.loadingBuilder,
-            ),
           ),
         );
       },

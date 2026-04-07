@@ -2,7 +2,11 @@ import '../models/dialog_config.dart';
 import '../models/storage_config.dart';
 import '../models/refresh_config.dart';
 import '../models/stormy_theme_config.dart';
+import '../models/i18n_config.dart';
 import '../accessor/config_accessor.dart';
+
+import 'package:flutter/widgets.dart'; // Locale needed here or we can use dart:ui
+import 'package:stormy_i18n/stormy_i18n.dart';
 
 import '../../core/network/stormy_network.dart';
 import '../../core/dialog/stormy_dialog.dart';
@@ -43,6 +47,9 @@ class StormyConfig {
   /// 主题配置
   StormyThemeConfig? theme;
 
+  /// 国际化配置
+  StormyI18nConfig? i18n;
+
   /// 应用配置
   Map<String, dynamic>? appConfig;
 
@@ -74,6 +81,7 @@ class StormyConfig {
   bool get isStorageConfigured => storage != null;
   bool get isRefreshConfigured => refresh != null;
   bool get isThemeConfigured => theme != null;
+  bool get isI18nConfigured => i18n != null;
 
   /// 应用配置到各个模块
   /// 返回应用结果
@@ -87,7 +95,7 @@ class StormyConfig {
     final List<String> sdkApplied = [];
 
     // 存储配置到全局访问器
-    StormyConfigAccessor.initialize(theme: theme);
+    StormyConfigAccessor.initialize(theme: theme, i18n: i18n);
 
     // 应用网络配置
     if (network != null) {
@@ -138,6 +146,44 @@ class StormyConfig {
       themeApplied = true;
     }
 
+    // 应用国际化配置
+    if (i18n != null) {
+      try {
+        if (!storageApplied) {
+          print('警告: I18n 依赖 Storage，但 Storage 未配置或应用失败');
+        }
+
+        final bucketName = (i18n!.storageBucket != null && i18n!.storageBucket!.isNotEmpty)
+            ? i18n!.storageBucket!
+            : StormyStorage.instance.currentBucketName;
+
+        await StormyI18n.init(
+          defaultLocale: i18n!.defaultLocale,
+          localeResolver: () async {
+            final data = StormyStorage.instance.bucket(bucketName).getString(i18n!.storageKey);
+            if (data != null && data.isNotEmpty) {
+              final parts = data.split('_');
+              return Locale(parts[0], parts.length > 1 ? parts[1] : null);
+            }
+            return null;
+          },
+          onSave: (locale) async {
+            if (locale == null) {
+              await StormyStorage.instance.bucket(bucketName).remove(i18n!.storageKey);
+            } else {
+              final localeStr = locale.countryCode != null
+                  ? '${locale.languageCode}_${locale.countryCode}'
+                  : locale.languageCode;
+              await StormyStorage.instance.bucket(bucketName).setString(i18n!.storageKey, localeStr);
+            }
+          },
+        );
+        localizationApplied = true;
+      } catch (e) {
+        print('国际化配置应用失败: $e');
+      }
+    }
+
     return StormyConfigApplied(
       networkApplied: networkApplied,
       dialogApplied: dialogApplied,
@@ -182,6 +228,12 @@ class StormyConfigBuilder {
   /// 配置主题模块
   StormyConfigBuilder theme(StormyThemeConfig config) {
     _config.theme = config;
+    return this;
+  }
+
+  /// 配置国际化模块
+  StormyConfigBuilder i18n(StormyI18nConfig config) {
+    _config.i18n = config;
     return this;
   }
 

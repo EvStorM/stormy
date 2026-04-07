@@ -17,7 +17,7 @@
     },
     {
       "name": "stormy_kit",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "dependencies": [
         "adaptive_theme",
         "cached_network_image",
@@ -48,6 +48,7 @@
         "permission_handler",
         "riverpod",
         "riverpod_annotation",
+        "stormy_i18n",
         "talker",
         "talker_dio_logger",
         "url_launcher",
@@ -413,18 +414,6 @@
       ]
     },
     {
-      "name": "riverpod",
-      "version": "3.2.1",
-      "dependencies": [
-        "async",
-        "clock",
-        "collection",
-        "meta",
-        "state_notifier",
-        "test"
-      ]
-    },
-    {
       "name": "url_launcher",
       "version": "6.3.2",
       "dependencies": [
@@ -451,6 +440,18 @@
       "version": "5.1.16",
       "dependencies": [
         "talker_logger"
+      ]
+    },
+    {
+      "name": "riverpod",
+      "version": "3.2.1",
+      "dependencies": [
+        "async",
+        "clock",
+        "collection",
+        "meta",
+        "state_notifier",
+        "test"
       ]
     },
     {
@@ -1128,38 +1129,6 @@
       "dependencies": []
     },
     {
-      "name": "test",
-      "version": "1.26.3",
-      "dependencies": [
-        "analyzer",
-        "async",
-        "boolean_selector",
-        "collection",
-        "coverage",
-        "http_multi_server",
-        "io",
-        "js",
-        "matcher",
-        "node_preamble",
-        "package_config",
-        "path",
-        "pool",
-        "shelf",
-        "shelf_packages_handler",
-        "shelf_static",
-        "shelf_web_socket",
-        "source_span",
-        "stack_trace",
-        "stream_channel",
-        "test_api",
-        "test_core",
-        "typed_data",
-        "web_socket_channel",
-        "webkit_inspection_protocol",
-        "yaml"
-      ]
-    },
-    {
       "name": "url_launcher_windows",
       "version": "3.1.5",
       "dependencies": [
@@ -1223,6 +1192,38 @@
       "dependencies": [
         "ansicolor",
         "web"
+      ]
+    },
+    {
+      "name": "test",
+      "version": "1.26.3",
+      "dependencies": [
+        "analyzer",
+        "async",
+        "boolean_selector",
+        "collection",
+        "coverage",
+        "http_multi_server",
+        "io",
+        "js",
+        "matcher",
+        "node_preamble",
+        "package_config",
+        "path",
+        "pool",
+        "shelf",
+        "shelf_packages_handler",
+        "shelf_static",
+        "shelf_web_socket",
+        "source_span",
+        "stack_trace",
+        "stream_channel",
+        "test_api",
+        "test_core",
+        "typed_data",
+        "web_socket_channel",
+        "webkit_inspection_protocol",
+        "yaml"
       ]
     },
     {
@@ -1579,6 +1580,11 @@
       ]
     },
     {
+      "name": "ansicolor",
+      "version": "2.0.3",
+      "dependencies": []
+    },
+    {
       "name": "webkit_inspection_protocol",
       "version": "1.2.1",
       "dependencies": [
@@ -1697,11 +1703,6 @@
         "vm_service",
         "yaml"
       ]
-    },
-    {
-      "name": "ansicolor",
-      "version": "2.0.3",
-      "dependencies": []
     },
     {
       "name": "flutter_inappwebview_internal_annotations",

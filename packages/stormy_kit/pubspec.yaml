@@ -1,6 +1,6 @@
 name: stormy_kit
 description: "Stormy - Flutter 开发框架，提供统一配置、SDK注册、模块管理等能力"
-version: 1.0.1
+version: 1.0.2
 resolution: workspace
 homepage: https://github.com/your-org/stormy
 repository: https://github.com/your-org/stormy
@@ -13,7 +13,8 @@ dependencies:
 
   # 网络请求
   dio: ^5.9.1
-
+  # 国际化
+  stormy_i18n: ^0.0.1
   # 本地存储
   hive_ce: ^2.19.3
   hive_ce_flutter: ^2.3.4
@@ -31,18 +32,29 @@ dependencies:
   adaptive_theme: ^3.7.2
   # 中文字体
   chinese_font_library: ^1.2.0
+  # 加载动画
   fade_shimmer: ^2.4.0
+  # 网络图片加载
   cached_network_image: ^3.4.1
+  # 弹窗
   flutter_smart_dialog: ^5.1.0
+  # 底部弹窗
   modal_bottom_sheet: ^3.0.0
+  # webview
   flutter_inappwebview: ^6.1.5
+  # 权限管理
   permission_handler: ^12.0.1
+  # 状态管理
   riverpod_annotation: ^4.0.2
+  riverpod: ^3.2.1
+  # 日志
   talker: ^5.1.16
   talker_dio_logger: ^5.1.16
+  # url启动
   url_launcher: ^6.3.2
-  riverpod: ^3.2.1
+  # 唯一id
   uuid: ^4.5.3
+  # 图片选择
   image_picker: ^1.2.1
   gal: ^2.3.2
   image: ^4.8.0

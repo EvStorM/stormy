@@ -47,5 +47,15 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSUserTrackingUsageDescription</key>
+	<string>This app requires tracking permission to get device identifier securely.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>This app requires camera permission to capture photos.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app requires photo library access to select pictures.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>This app requires photo library access to save pictures.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>This app requires microphone access for video recording.</string>
 </dict>
 </plist>

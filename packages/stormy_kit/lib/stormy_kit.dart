@@ -4,6 +4,7 @@
 // Config exports - 配置层
 export 'config/config.dart';
 export 'config/builder/stormy_config.dart';
+export 'config/models/i18n_config.dart';
 
 // Core exports - 核心功能
 export 'core/app/app_export.dart';
@@ -28,6 +29,7 @@ export 'widgets/widgets.dart';
 export 'utils/stormy_utils.dart';
 
 // 导出第三方库
+export 'package:stormy_i18n/stormy_i18n.dart';
 export 'package:flutter_smart_dialog/flutter_smart_dialog.dart';
 export 'package:permission_handler/permission_handler.dart';
 export 'package:talker/talker.dart';

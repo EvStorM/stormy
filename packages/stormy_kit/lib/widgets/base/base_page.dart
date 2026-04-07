@@ -30,6 +30,7 @@ class BasePage extends StatefulWidget {
     this.useSafeArea = true,
     this.contentPadding,
     this.fillChildMaxHeight = false,
+    this.disableScroll = false,
     this.scrollController,
     this.scrollPhysics,
     this.enableAutoScrollPhysics = true,
@@ -93,11 +94,16 @@ class BasePage extends StatefulWidget {
 
   /// 是否强制子组件在高度方向撑满可用区域（精确等于可用高度）。
   ///
-  /// - 为 `false`（默认）时：对子组件仅施加最小高度约束，使其“至少”占满页面可用高度，
-  ///   适用于需要在内容不足一屏时填满，但超出时仍可自然滚动的场景。
   /// - 为 `true` 时：对子组件施加“精确”高度约束（minHeight = maxHeight = 可用高度），
   ///   适用于需要让内部布局（如 `Column` 的 `MainAxisAlignment.spaceBetween`）基于确定高度进行分配的场景。
   final bool fillChildMaxHeight;
+
+  /// 是否禁用内置的页面侧滚动（即不套一层 `SingleChildScrollView`）。
+  ///
+  /// 当 [child] 内自带滚动组件时为防止外层给出无边界的高度导致报错，需要禁用外层滚动。
+  /// BasePage 默认会自动识别 `ListView`、`GridView` 等 `ScrollView` 或 `SingleChildScrollView`，
+  /// 如果由于你将列表封装在了自定义的 `StatelessWidget` 中导致无法正确识别，才需要手动将此参数传 `true`。
+  final bool disableScroll;
 
   /// 外部自定义的 ScrollController。
   final ScrollController? scrollController;
@@ -188,8 +194,18 @@ class _BasePageState extends State<BasePage> {
             top: topSafeInset,
             bottom: bottomSafeInset,
           )).add(widget.contentPadding ?? EdgeInsets.zero);
+
+          // 自动识别常见的自带滚动特性的组件
+          final bool autoDisableScroll =
+              widget.child is ScrollView ||
+              widget.child is SingleChildScrollView;
+          final bool noOuterScroll =
+              widget.fillChildMaxHeight ||
+              widget.disableScroll ||
+              autoDisableScroll;
+
           // 构造内部内容：先应用 Padding，再按需使用最小/精确高度约束，保证在安全区内正确填充可用高度
-          final BoxConstraints contentConstraints = widget.fillChildMaxHeight
+          final BoxConstraints contentConstraints = noOuterScroll
               ? BoxConstraints(minHeight: maxHeight, maxHeight: maxHeight)
               : BoxConstraints(minHeight: availableHeight);
           final Widget innerContent = ConstrainedBox(
@@ -197,18 +213,26 @@ class _BasePageState extends State<BasePage> {
             child: Padding(padding: combinedPadding, child: widget.child),
           );
 
-          // 当 fillChildMaxHeight 为 true 时，内容需要固定高度，不应该使用 SingleChildScrollView
-          // 因为 SingleChildScrollView 会提供无界约束，导致内部使用 Expanded 的组件无法工作
-          if (widget.fillChildMaxHeight) {
-            return innerContent;
-          }
-
           // 交给测量组件，驱动自动滚动物理计算
           final Widget measuredChild = _MeasuredChild(
             onSizeChanged: _handleContentSizeChanged,
             child: innerContent,
           );
           final ScrollPhysics effectivePhysics = _resolveScrollPhysics();
+
+          // 当需固定高度或禁用内置外层滚动时，不使用 SingleChildScrollView。
+          if (noOuterScroll) {
+            if (widget.easyRefreshConfig != null) {
+              return widget.easyRefreshConfig!.build(
+                measuredChild: measuredChild,
+                scrollController: widget.scrollController,
+                physics: effectivePhysics,
+                outerScroll: false,
+              );
+            }
+            return measuredChild;
+          }
+
           if (widget.easyRefreshConfig != null) {
             return widget.easyRefreshConfig!.build(
               measuredChild: measuredChild,
@@ -398,6 +422,7 @@ class EasyRefreshConfig {
     required Widget measuredChild,
     ScrollController? scrollController,
     ScrollPhysics? physics,
+    bool outerScroll = true,
   }) {
     return EasyRefresh.builder(
       controller: controller,
@@ -421,6 +446,16 @@ class EasyRefreshConfig {
       triggerAxis: triggerAxis,
       scrollController: this.scrollController ?? scrollController,
       childBuilder: (context, refreshPhysics) {
+        if (!outerScroll) {
+          // 在不使用外层 SingleChildScrollView 时，通过 ScrollConfiguration
+          // 透传 refreshPhysics，使得自带滚动的子组件能够完美对接下拉刷新
+          return ScrollConfiguration(
+            behavior: ScrollConfiguration.of(
+              context,
+            ).copyWith(physics: refreshPhysics),
+            child: measuredChild,
+          );
+        }
         // 优先使用 refreshPhysics 以确保下拉刷新功能正常工作
         final ScrollPhysics effectivePhysics = refreshPhysics;
         final ScrollController? effectiveController =

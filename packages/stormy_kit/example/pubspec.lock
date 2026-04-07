@@ -1249,13 +1249,21 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.0"
+  stormy_i18n:
+    dependency: transitive
+    description:
+      name: stormy_i18n
+      sha256: f48161899c16df2d8f6f16e483ff0ebcb10814b239bb11fd158318cb8b2b5561
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.0.1"
   stormy_kit:
     dependency: "direct main"
     description:
       path: ".."
       relative: true
     source: path
-    version: "1.0.1"
+    version: "1.0.2"
   stream_channel:
     dependency: transitive
     description:

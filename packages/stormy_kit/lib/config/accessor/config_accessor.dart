@@ -1,4 +1,5 @@
 import '../config.dart';
+import '../models/i18n_config.dart';
 import '../../core/network/stormy_network.dart';
 
 /// 支持的语言枚举
@@ -32,6 +33,10 @@ class StormyConfigAccessor {
   static StormyAssetsConfig? _assets;
   static StormyAssetsConfig? get assets => _assets;
 
+  /// 国际化配置
+  static StormyI18nConfig? _i18n;
+  static StormyI18nConfig? get i18n => _i18n;
+
   /// 当前语言环境
   static StormyLanguage _currentLanguage = StormyLanguage.zhCN;
   static StormyLanguage get currentLanguage => _currentLanguage;
@@ -41,8 +46,9 @@ class StormyConfigAccessor {
 
   /// 初始化配置
   /// 供 StormyConfig.apply() 调用
-  static void initialize({StormyThemeConfig? theme}) {
+  static void initialize({StormyThemeConfig? theme, StormyI18nConfig? i18n}) {
     _theme = theme;
+    _i18n = i18n;
   }
 
   /// 设置主题配置

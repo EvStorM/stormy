@@ -1,12 +1,18 @@
 import 'dart:typed_data';
 
-import 'package:example/src/head_info.dart';
 import 'package:flutter/material.dart';
 import 'package:stormy_kit/stormy_kit.dart';
 
-import 'src/theme.dart';
-import 'src/storage_demo.dart';
-import 'src/network_demo.dart';
+import 'l10n/stormy_i18n.dart';
+import 'src/head_info.dart';
+import 'src/pages/home_page.dart';
+import 'src/pages/theme_demo.dart';
+import 'src/pages/storage_demo.dart';
+import 'src/pages/network_demo.dart';
+import 'src/pages/dialog_demo.dart';
+import 'src/pages/widgets_demo.dart';
+import 'src/pages/refresh_demo.dart';
+import 'src/pages/i18n_demo.dart';
 
 /// 生成测试用加密密钥（32字节 = 256位）
 /// 警告：实际生产环境应从 flutter_secure_storage 等安全存储获取
@@ -37,6 +43,12 @@ void main() async {
         defaultRequireToken: false, // 设置为 false 方便直接调用
       ))
       .storage(storageConfig)
+      .i18n(StormyI18nConfig(
+        defaultLocale: const Locale('zh', 'CN'),
+        storageKey: 'example_app_locale',
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+      ))
       .theme(
         StormyThemeConfig(
           themeMode: ThemeMode.system,
@@ -60,14 +72,29 @@ class MyApp extends StatelessWidget {
         designSize: const Size(375, 812),
       ),
       router: GoRouter(
+        initialLocation: '/',
         routes: [
-          GoRoute(path: '/', builder: (context, state) => ThemeDemoPage()),
+          GoRoute(path: '/', builder: (context, state) => const HomePage()),
+          GoRoute(
+              path: '/theme',
+              builder: (context, state) => const ThemeDemoPage()),
           GoRoute(
               path: '/storage',
               builder: (context, state) => const StorageDemoPage()),
           GoRoute(
               path: '/network',
               builder: (context, state) => const NetworkDemoPage()),
+          GoRoute(
+              path: '/dialog',
+              builder: (context, state) => const DialogDemoPage()),
+          GoRoute(
+              path: '/widgets',
+              builder: (context, state) => const WidgetsDemoPage()),
+          GoRoute(
+              path: '/refresh',
+              builder: (context, state) => const RefreshDemoPage()),
+          GoRoute(
+              path: '/i18n', builder: (context, state) => const I18nDemoPage()),
         ],
       ),
     );

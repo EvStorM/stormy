@@ -61,12 +61,12 @@ class AppInitializer {
     ensureFlutterBinding();
 
     // 配置 debugPrint 输出（必须在绑定初始化之后）
-    configureDebugPrint();
+    // configureDebugPrint();
 
     // 设置屏幕方向（仅支持竖屏）
-    await setScreenOrientation();
+    setScreenOrientation();
 
     // 设置高刷新率
-    await setHighRefreshRate();
+    // setHighRefreshRate();
   }
 }

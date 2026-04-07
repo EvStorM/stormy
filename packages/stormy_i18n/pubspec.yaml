@@ -3,6 +3,10 @@ description: "A robust Flutter package for managing and automatically generating
 version: 0.0.1
 resolution: workspace
 
+homepage: https://github.com/EvStorM/stormy/tree/main/packages/stormy_i18n
+repository: https://github.com/EvStorM/stormy/tree/main/packages/stormy_i18n
+issue_tracker: https://github.com/EvStorM/stormy/issues
+
 
 environment:
   sdk: ^3.10.3

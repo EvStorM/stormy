@@ -11,7 +11,7 @@ class NetworkDemoPage extends StatefulWidget {
 class _NetworkDemoPageState extends State<NetworkDemoPage> {
   String _result = 'Waiting for action...';
   bool _isLoading = false;
-  bool _isChecked = false;
+
 
   void _appendResult(String text) {
     if (!mounted) return;
@@ -119,34 +119,6 @@ class _NetworkDemoPageState extends State<NetworkDemoPage> {
       appBar: AppBar(title: const Text('Network Demo')),
       body: Column(
         children: [
-          Container(
-            width: 1.sw,
-            padding: context.theme.mainPadding,
-            child: AgreementWidget(
-              isChecked: _isChecked,
-              onChanged: (value) {
-                setState(() {
-                  _isChecked = value;
-                });
-              },
-              iconSize: 14.0,
-              spacing: 2.0,
-              mainAxisAlignment: MainAxisAlignment.center, // 整体居中
-              textAlign: TextAlign.start, // 多行文本居中
-              textStyle: TextStyle(fontSize: 13.sp, color: Colors.grey),
-              protocolStyle:
-                  TextStyle(fontSize: 13.sp, color: context.theme.primary),
-              segments: const [
-                TextSegment('已阅读并接受'),
-                ProtocolSegment(
-                    AgreeItemModel(label: '《用户协议》', agreeUrl: '...')),
-                TextSegment('以及'),
-                ProtocolSegment(
-                    AgreeItemModel(label: '《隐私政策》', agreeUrl: '...')),
-                TextSegment('已阅读并接受已阅读并接受'),
-              ],
-            ),
-          ),
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(16),
