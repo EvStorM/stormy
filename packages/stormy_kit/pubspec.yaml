@@ -57,6 +57,7 @@ dependencies:
   # 图片选择
   image_picker: ^1.2.1
   path_provider: ^2.1.5
+  crypto: ^3.0.3
   gal: ^2.3.2
   image: ^4.8.0
   hooks_riverpod: ^3.3.1
