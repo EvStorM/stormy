@@ -1,0 +1,4 @@
+# melos_managed_dependency_overrides: stormy_kit
+dependency_overrides:
+  stormy_kit:
+    path: ..

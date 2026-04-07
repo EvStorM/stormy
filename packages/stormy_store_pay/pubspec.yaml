@@ -1,0 +1,22 @@
+name: stormy_store_pay
+description: "Stormy Store Pay - 统一内购 SDK，支持 Google Play 和 Apple App Store 双平台内购。"
+version: 1.0.0
+resolution: workspace
+
+environment:
+  sdk: ^3.10.3
+  flutter: ">=1.17.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  in_app_purchase: ^3.2.3
+  in_app_purchase_android: any
+  in_app_purchase_storekit: any
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+<module fileurl="file://$PROJECT_DIR$/packages/stormy_china_pay/melos_stormy_china_pay.iml" filepath="$PROJECT_DIR$/packages/stormy_china_pay/melos_stormy_china_pay.iml"/>
+<module fileurl="file://$PROJECT_DIR$/packages/stormy_i18n/melos_stormy_i18n.iml" filepath="$PROJECT_DIR$/packages/stormy_i18n/melos_stormy_i18n.iml"/>
+<module fileurl="file://$PROJECT_DIR$/packages/stormy_kit/melos_stormy_kit.iml" filepath="$PROJECT_DIR$/packages/stormy_kit/melos_stormy_kit.iml"/>
+<module fileurl="file://$PROJECT_DIR$/packages/stormy_store_pay/melos_stormy_store_pay.iml" filepath="$PROJECT_DIR$/packages/stormy_store_pay/melos_stormy_store_pay.iml"/>
+<module fileurl="file://$PROJECT_DIR$/melos_stormy_kit_workspace.iml" filepath="$PROJECT_DIR$/melos_stormy_kit_workspace.iml"/>
+<module fileurl="file://$PROJECT_DIR$/sdk/china_pay/melos_china_pay.iml" filepath="$PROJECT_DIR$/sdk/china_pay/melos_china_pay.iml"/>
+<module fileurl="file://$PROJECT_DIR$/stormy_kit/melos_stormy_kit.iml" filepath="$PROJECT_DIR$/stormy_kit/melos_stormy_kit.iml"/>
+    </modules>
+  </component>
+</project>

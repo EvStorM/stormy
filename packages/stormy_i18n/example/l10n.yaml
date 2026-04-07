@@ -1,0 +1,5 @@
+# 由 stormy_i18n 自动映射生成的 flutter_localizations 配置文件
+arb-dir: lib/l10n/arb
+template-arb-file: app_zh_CN.arb
+output-dir: lib/l10n/generator
+output-localization-file: app_localizations.dart

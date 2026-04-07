@@ -1,0 +1,35 @@
+# Stormy I18n 配置文件
+# 是否启用代码生成
+enabled: true
+
+# 翻译源文件（Dart 语言）存放目录
+source_dir: lib/l10n/src
+
+# 最终生成的 ARB 文件存放目录
+output_dir: lib/l10n/arb
+
+# 自动生成的多语言原生代码存放目录
+generator_dir: lib/l10n/generator
+
+# 拓展帮助类（包含 I18nItem 与 context.l10n）生成的路径
+# 这个文件将随工具产生，供项目中统一 import
+extension_output: lib/l10n/stormy_i18n.dart
+
+# Flutter 原生本地化的主模板文件名 (取决于你的默认语言)
+template_arb_file: app_zh_CN.arb
+
+# 自动生成的多语言类名 (原生的 flutter_localizations 生成文件名)
+output_localization_file: app_localizations.dart
+
+# 支持的地区语言标识列表 (例如 zh_CN, en_US)
+# 当增加新语言时，在此处添加，并重新运行 dart run stormy_i18n gen
+locales:
+  - zh_CN
+  - zh_TW
+  - en_US
+
+# 为基础语言指定默认的地区变体，用于自动生成满足原生系统回退要求的 Base ARB 文件。
+# 例如，指定 zh 的默认语言为 zh_CN
+base_locale_defaults:
+  zh: zh_TW
+#   en: en_US

@@ -1,0 +1,19 @@
+name: stormy_kit_workspace
+publish_to: none
+workspace:
+  - packages/stormy_kit
+  - packages/stormy_china_pay
+  - packages/stormy_store_pay
+  - packages/stormy_i18n
+environment:
+  sdk: ">=3.10.3 <4.0.0"
+dev_dependencies:
+  melos: ^7.5.0
+melos:
+  name: stormy_kit_workspace
+  packages:
+    - packages/**
+  scripts:
+    upgrade_major_versions:
+      run: |
+        melos exec -- flutter pub upgrade --major-versions
