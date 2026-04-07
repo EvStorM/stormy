@@ -2,7 +2,8 @@ name: stormy_china_pay
 description: "A new Flutter package project."
 version: 0.0.1
 resolution: workspace
-
+homepage: https://github.com/EvStorM/stormy
+repository: https://github.com/EvStorM/stormy
 environment:
   sdk: ^3.10.3
   flutter: ">=1.17.0"
