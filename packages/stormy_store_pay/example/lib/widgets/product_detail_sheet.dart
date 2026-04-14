@@ -1,25 +1,24 @@
-import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:stormy_store_pay/stormy_store_pay.dart';
 
 /// 产品详情弹窗
 class ProductDetailSheet extends StatelessWidget {
-  final ProductDetails product;
-  final AppleProductInfo? appleInfo;
-  final VoidCallback onPurchase;
+  final StoreProductInfo product;
+  final void Function(StoreProductInfo product, StoreOfferInfo? offer) onPurchase;
 
   const ProductDetailSheet({
     super.key,
     required this.product,
-    this.appleInfo,
     required this.onPurchase,
   });
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final subInfo = appleInfo?.subscriptionInfo;
+    final subInfo = product.subscriptionInfo;
+    final hasOffers = product.offers.isNotEmpty;
+    final pInfo = product.priceInfo;
 
     return DraggableScrollableSheet(
       initialChildSize: 0.65,
@@ -42,7 +41,7 @@ class ProductDetailSheet extends StatelessWidget {
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
-                    color: cs.onSurfaceVariant.withValues(alpha: 0.3),
+                    color: cs.onSurfaceVariant.withAlpha(77),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -69,14 +68,12 @@ class ProductDetailSheet extends StatelessWidget {
                 title: '基础信息',
                 children: [
                   _InfoRow('产品 ID', product.id),
-                  _InfoRow('价格', '${product.price} (${product.rawPrice})'),
-                  _InfoRow(
-                    '货币',
-                    '${product.currencySymbol} ${product.currencyCode}',
-                  ),
-                  if (appleInfo != null) ...[
-                    _InfoRow('产品类型', _productTypeName(appleInfo!.productType)),
-                  ],
+                  _InfoRow('类型', _productTypeName(product.type)),
+                  _InfoRow('价格', pInfo.formattedPrice),
+                  _InfoRow('本币标识', '${pInfo.currencySymbol} / ${pInfo.currencyCode}'),
+                  if (pInfo.pricePerMonth != null) ...[
+                     _InfoRow('约合月度', '${pInfo.currencySymbol}${pInfo.pricePerMonth!.toStringAsFixed(2)}/月'),
+                  ]
                 ],
               ),
 
@@ -86,19 +83,35 @@ class ProductDetailSheet extends StatelessWidget {
                 _DetailSection(
                   title: '订阅信息',
                   children: [
-                    _InfoRow('订阅周期', _periodText(subInfo.subscriptionPeriod)),
-                    _InfoRow('订阅组 ID', subInfo.subscriptionGroupId),
+                    _InfoRow('订阅周期', _periodText(subInfo.period)),
+                    _InfoRow('订阅组 ID', subInfo.groupId),
+                    if (subInfo.googleBasePlanId != null)
+                      _InfoRow('Google BasePlan ID', subInfo.googleBasePlanId!),
                   ],
                 ),
               ],
 
+              // 高级价格信息
+              const SizedBox(height: 12),
+              _DetailSection(
+                title: '高级价格推导',
+                children: [
+                  _InfoRow('当前价格', pInfo.currentPrice.toString()),
+                  _InfoRow('符号位置', pInfo.symbolBeforePrice ? '前置 (Prefix)' : '后置 (Suffix)'),
+                  if (pInfo.pricePerDay != null) _InfoRow('日均价格', '${pInfo.currencySymbol}${pInfo.pricePerDay!.toStringAsFixed(3)}'),
+                  if (pInfo.pricePerWeek != null) _InfoRow('周均价格', '${pInfo.currencySymbol}${pInfo.pricePerWeek!.toStringAsFixed(2)}'),
+                  if (pInfo.pricePerMonth != null) _InfoRow('月均价格', '${pInfo.currencySymbol}${pInfo.pricePerMonth!.toStringAsFixed(2)}'),
+                  if (pInfo.pricePerYear != null) _InfoRow('年均价格', '${pInfo.currencySymbol}${pInfo.pricePerYear!.toStringAsFixed(2)}'),
+                ],
+              ),
+
               // 优惠列表
-              if (subInfo != null && subInfo.promotionalOffers.isNotEmpty) ...[
+              if (hasOffers) ...[
                 const SizedBox(height: 12),
                 _DetailSection(
-                  title: '优惠方案 (${subInfo.promotionalOffers.length})',
+                  title: '优惠方案 (${product.offers.length})',
                   children: [
-                    for (final offer in subInfo.promotionalOffers)
+                    for (final offer in product.offers)
                       _OfferRow(offer: offer),
                   ],
                 ),
@@ -108,12 +121,9 @@ class ProductDetailSheet extends StatelessWidget {
 
               // 购买按钮
               FilledButton.icon(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  onPurchase();
-                },
-                icon: const Icon(Icons.shopping_cart_outlined),
-                label: Text('购买 ${product.price}'),
+                onPressed: product.isPurchased ? null : () => onPurchase(product, null),
+                icon: Icon(product.isPurchased ? Icons.check_circle : Icons.shopping_cart_outlined),
+                label: Text(product.isPurchased ? '已购买此项目' : '购买 ${product.priceInfo.formattedPrice}'),
                 style: FilledButton.styleFrom(
                   minimumSize: const Size.fromHeight(48),
                   textStyle: const TextStyle(
@@ -124,15 +134,17 @@ class ProductDetailSheet extends StatelessWidget {
               ),
 
               // 使用优惠购买
-              if (subInfo != null && subInfo.promotionalOffers.isNotEmpty) ...[
+              if (hasOffers && !product.isPurchased) ...[
                 const SizedBox(height: 8),
                 OutlinedButton.icon(
-                  onPressed: () async {
-                    Navigator.of(context).pop();
-                    await _purchaseWithOffer(context, product);
+                  onPressed: () {
+                    // 对于 Android，如果有一个主要 Offer，可以直接用来买
+                    // iOS 则可以由用户选择对应的促销。此处默认获取最新一个有效的用于购买。
+                    final firstUsableOffer = product.offers.first;
+                    onPurchase(product, firstUsableOffer);
                   },
                   icon: const Icon(Icons.local_offer_outlined),
-                  label: const Text('使用优惠购买'),
+                  label: Text('使用第一个优惠购买 (${product.offers.first.priceInfo.formattedPrice})'),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size.fromHeight(44),
                   ),
@@ -145,37 +157,21 @@ class ProductDetailSheet extends StatelessWidget {
     );
   }
 
-  Future<void> _purchaseWithOffer(
-    BuildContext context,
-    ProductDetails product,
-  ) async {
-    if (!Platform.isIOS) return;
-    final ext = StorePayManager.instance.appleExtension;
-    if (ext == null) return;
-
-    final offers = await ext.getSubscriptionOffers(product.id);
-    if (offers.isEmpty) return;
-
-    // 直接使用第一个优惠
-    await ext.purchaseWithOffer(product, offers.first);
-  }
-
-  String _productTypeName(AppleProductType type) {
+  String _productTypeName(StoreProductType type) {
     return switch (type) {
-      AppleProductType.consumable => '消耗型 (Consumable)',
-      AppleProductType.nonConsumable => '非消耗型 (Non-Consumable)',
-      AppleProductType.nonRenewable => '非续期订阅 (Non-Renewing)',
-      AppleProductType.autoRenewable => '自动续期订阅 (Auto-Renewable)',
-      AppleProductType.unknown => '未知',
+      StoreProductType.consumable => '直冲消耗品',
+      StoreProductType.nonConsumable => '非消耗品/终身',
+      StoreProductType.subscription => '订阅/通行证',
+      StoreProductType.unknown => '未知',
     };
   }
 
-  String _periodText(AppleSubscriptionPeriodInfo p) {
+  String _periodText(StorePeriod p) {
     final unitStr = switch (p.unit) {
-      AppleSubscriptionPeriodUnit.day => '天',
-      AppleSubscriptionPeriodUnit.week => '周',
-      AppleSubscriptionPeriodUnit.month => '月',
-      AppleSubscriptionPeriodUnit.year => '年',
+      StorePeriodUnit.day => '天',
+      StorePeriodUnit.week => '周',
+      StorePeriodUnit.month => '月',
+      StorePeriodUnit.year => '年',
       _ => '?',
     };
     return '${p.value}$unitStr';
@@ -251,7 +247,7 @@ class _InfoRow extends StatelessWidget {
 // ========== 优惠行 ==========
 
 class _OfferRow extends StatelessWidget {
-  final AppleSubscriptionOfferInfo offer;
+  final StoreOfferInfo offer;
 
   const _OfferRow({required this.offer});
 
@@ -259,22 +255,22 @@ class _OfferRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final periodUnit = switch (offer.period.unit) {
-      AppleSubscriptionPeriodUnit.day => '天',
-      AppleSubscriptionPeriodUnit.week => '周',
-      AppleSubscriptionPeriodUnit.month => '月',
-      AppleSubscriptionPeriodUnit.year => '年',
+      StorePeriodUnit.day => '天',
+      StorePeriodUnit.week => '周',
+      StorePeriodUnit.month => '月',
+      StorePeriodUnit.year => '年',
       _ => '?',
     };
     final paymentStr = switch (offer.paymentMode) {
-      AppleSubscriptionOfferPaymentMode.freeTrial => '免费试用',
-      AppleSubscriptionOfferPaymentMode.payAsYouGo => '按期付费',
-      AppleSubscriptionOfferPaymentMode.payUpFront => '预付',
+      StorePaymentMode.freeTrial => '免费试用',
+      StorePaymentMode.payAsYouGo => '按期付费',
+      StorePaymentMode.payUpFront => '预付',
       _ => '未知',
     };
     final offerTypeStr = switch (offer.type) {
-      AppleSubscriptionOfferType.introductory => '入门优惠',
-      AppleSubscriptionOfferType.promotional => '促销优惠',
-      AppleSubscriptionOfferType.winBack => '回归优惠',
+      StoreOfferType.introductory => '入门优惠',
+      StoreOfferType.promotional => '促销优惠',
+      StoreOfferType.freeTrial => '免费试用',
       _ => '未知',
     };
 
@@ -282,9 +278,9 @@ class _OfferRow extends StatelessWidget {
       margin: const EdgeInsets.symmetric(vertical: 3),
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+        color: cs.surfaceContainerHighest.withAlpha(128),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.3)),
+        border: Border.all(color: cs.outlineVariant.withAlpha(77)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -323,22 +319,22 @@ class _OfferRow extends StatelessWidget {
               ),
               const Spacer(),
               Text(
-                offer.price == 0 ? '免费' : '¥${offer.price}',
+                offer.priceInfo.currentPrice == 0 ? '免费' : offer.priceInfo.formattedPrice,
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
-                  color: offer.price == 0 ? Colors.green : cs.primary,
+                  color: offer.priceInfo.currentPrice == 0 ? Colors.green : cs.primary,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 4),
           Text(
-            'ID: ${offer.id ?? "无"}  ·  周期: ${offer.period.value}$periodUnit × ${offer.periodCount}次',
+            'ID: ${offer.id}  ·  周期: ${offer.period.value}$periodUnit × ${offer.paymentCount}次',
             style: TextStyle(
               fontSize: 10,
               fontFamily: 'monospace',
-              color: cs.onSurfaceVariant.withValues(alpha: 0.7),
+              color: cs.onSurfaceVariant.withAlpha(179),
             ),
           ),
         ],

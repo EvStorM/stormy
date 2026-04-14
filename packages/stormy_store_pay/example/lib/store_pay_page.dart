@@ -19,8 +19,7 @@ class StorePayExamplePage extends StatefulWidget {
 class _StorePayExamplePageState extends State<StorePayExamplePage> {
   final List<String> _logs = [];
   bool _isInitializing = true;
-  List<ProductDetails> _products = [];
-  List<AppleProductInfo> _appleInfos = [];
+  List<StoreProductInfo> _products = [];
 
   @override
   void initState() {
@@ -36,6 +35,12 @@ class _StorePayExamplePageState extends State<StorePayExamplePage> {
       _logs.insert(0, '$ts  $message');
     });
     debugPrint(message);
+  }
+
+  void _clearLogs() {
+    setState(() {
+      _logs.clear();
+    });
   }
 
   Future<void> _initStorePay() async {
@@ -69,7 +74,6 @@ class _StorePayExamplePageState extends State<StorePayExamplePage> {
           setState(() {
             _products = products;
           });
-          _loadAppleInfos();
         },
         onPurchaseRestored: (event) {
           _log('恢复购买: ${event.productId}');
@@ -88,34 +92,16 @@ class _StorePayExamplePageState extends State<StorePayExamplePage> {
   Future<void> _queryProducts() async {
     _log('查询全部 ${allProductIds.length} 个产品...');
     try {
-      await StorePayManager.instance.queryProducts(allProductIds);
+      await StorePayManager.instance.queryProducts(
+        allProductIds,
+        autoRestorePurchases: true,
+      );
     } catch (e) {
       _log('查询异常: $e');
     }
   }
 
-  Future<void> _loadAppleInfos() async {
-    if (!Platform.isIOS) return;
-    final ext = StorePayManager.instance.appleExtension;
-    if (ext == null) return;
-
-    try {
-      final infos = await ext.queryAppleProductInfos(allProductIds);
-      setState(() => _appleInfos = infos);
-      _log('Apple 详情: ${infos.length} 个');
-    } catch (e) {
-      _log('Apple 详情加载失败: $e');
-    }
-  }
-
-  AppleProductInfo? _findAppleInfo(String productId) {
-    return _appleInfos.cast<AppleProductInfo?>().firstWhere(
-      (i) => i!.productId == productId,
-      orElse: () => null,
-    );
-  }
-
-  Future<void> _purchaseProduct(ProductDetails product) async {
+  Future<void> _purchaseProduct(StoreProductInfo product) async {
     _log('尝试购买: ${product.id}');
     try {
       await StorePayManager.instance.purchaseProduct(product);
@@ -143,41 +129,25 @@ class _StorePayExamplePageState extends State<StorePayExamplePage> {
 
   // ========== 分类逻辑 ==========
 
-  /// 按 Apple 产品类型分组
-  Map<String, List<ProductDetails>> get _groupedProducts {
-    final map = <String, List<ProductDetails>>{
-      '消耗型': [],
-      '非消耗型': [],
-      '非续期订阅': [],
-      '自动续期订阅': [],
+  /// 按产品类型分组
+  Map<String, List<StoreProductInfo>> get _groupedProducts {
+    final map = <String, List<StoreProductInfo>>{
+      '直充消耗品': [],
+      '非消耗品 (终身)': [],
+      '订阅服务': [],
       '未知': [],
     };
 
     for (final p in _products) {
-      final info = _findAppleInfo(p.id);
-      final type = info?.productType;
-      switch (type) {
-        case AppleProductType.consumable:
-          map['消耗型']!.add(p);
-        case AppleProductType.nonConsumable:
-          map['非消耗型']!.add(p);
-        case AppleProductType.nonRenewable:
-          map['非续期订阅']!.add(p);
-        case AppleProductType.autoRenewable:
-          map['自动续期订阅']!.add(p);
-        default:
-          // 无 Apple 信息时按 ID 猜测
-          if (p.id.contains('consumable') && !p.id.contains('non_consumable')) {
-            map['消耗型']!.add(p);
-          } else if (p.id.contains('non_consumable')) {
-            map['非消耗型']!.add(p);
-          } else if (p.id.contains('non_renewing')) {
-            map['非续期订阅']!.add(p);
-          } else if (p.id.contains('sub_')) {
-            map['自动续期订阅']!.add(p);
-          } else {
-            map['未知']!.add(p);
-          }
+      switch (p.type) {
+        case StoreProductType.consumable:
+          map['直充消耗品']!.add(p);
+        case StoreProductType.nonConsumable:
+          map['非消耗品 (终身)']!.add(p);
+        case StoreProductType.subscription:
+          map['订阅服务']!.add(p);
+        case StoreProductType.unknown:
+          map['未知']!.add(p);
       }
     }
 
@@ -190,11 +160,9 @@ class _StorePayExamplePageState extends State<StorePayExamplePage> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Store Pay SDK 测试'),
+        title: const Text('Store Pay 2.0 测试'),
         actions: [
           IconButton(
             icon: const Icon(Icons.card_giftcard),
@@ -248,94 +216,60 @@ class _StorePayExamplePageState extends State<StorePayExamplePage> {
 
                 // 产品列表
                 Expanded(
-                  flex: 3,
+                  flex: 2,
                   child: _products.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.inbox_outlined,
-                                size: 48,
-                                color: cs.onSurfaceVariant.withValues(
-                                  alpha: 0.4,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                '暂无商品',
-                                style: TextStyle(color: cs.onSurfaceVariant),
-                              ),
-                            ],
+                      ? const Center(
+                          child: Text(
+                            '尚未加载产品',
+                            style: TextStyle(color: Colors.grey),
                           ),
                         )
-                      : ListView(
-                          children: [
-                            for (final entry in _groupedProducts.entries) ...[
-                              SectionHeader(
-                                title: entry.key,
-                                count: entry.value.length,
-                              ),
-                              ...entry.value.map(
-                                (p) => ProductCard(
-                                  product: p,
-                                  appleInfo: _findAppleInfo(p.id),
-                                  onPurchase: () => _purchaseProduct(p),
-                                  onViewDetail: () => _showProductDetail(p),
+                      : ListView.builder(
+                          itemCount: _groupedProducts.length,
+                          itemBuilder: (context, index) {
+                            final title = _groupedProducts.keys.elementAt(index);
+                            final items = _groupedProducts[title]!;
+
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                SectionHeader(
+                                  title: title,
+                                  count: items.length,
                                 ),
-                              ),
-                            ],
-                          ],
+                                ...items.map(
+                                  (p) => ProductCard(
+                                    product: p,
+                                    onPurchase: () => _purchaseProduct(p),
+                                    onViewDetail: () {
+                                      showModalBottomSheet(
+                                        context: context,
+                                        isScrollControlled: true,
+                                        backgroundColor:
+                                            Colors.transparent,
+                                        builder:
+                                            (ctx) => ProductDetailSheet(
+                                              product: p,
+                                              onPurchase:
+                                                  (product, offer) {
+                                                Navigator.pop(ctx);
+                                                StorePayManager.instance.purchaseProduct(product, offer: offer);
+                                              },
+                                            ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
                         ),
                 ),
 
-                // 日志区域
                 const Divider(height: 1),
-                LogHeader(
-                  count: _logs.length,
-                  onClear: () {
-                    setState(() => _logs.clear());
-                  },
-                ),
-                Expanded(
-                  flex: 2,
-                  child: Container(
-                    color: cs.surfaceContainerLowest,
-                    child: ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      itemCount: _logs.length,
-                      itemBuilder: (context, index) {
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 2),
-                          child: SelectableText(
-                            _logs[index],
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: cs.onSurfaceVariant,
-                              height: 1.4,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
+                LogPanel(logs: _logs, onClear: _clearLogs),
               ],
             ),
-    );
-  }
-
-  void _showProductDetail(ProductDetails product) {
-    final appleInfo = _findAppleInfo(product.id);
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      builder: (_) => ProductDetailSheet(
-        product: product,
-        appleInfo: appleInfo,
-        onPurchase: () => _purchaseProduct(product),
-      ),
     );
   }
 }

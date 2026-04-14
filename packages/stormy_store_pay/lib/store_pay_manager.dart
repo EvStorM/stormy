@@ -7,53 +7,6 @@ import 'stormy_store_pay.dart';
 /// 内购管理器 - 统一入口
 ///
 /// 支持 Google Play 和 Apple App Store 双平台内购
-///
-/// 功能特性：
-/// - 自动根据平台选择对应的实现（Google Play / Apple App Store）
-/// - 统一的接口和回调机制
-/// - 平台特定功能通过扩展类提供
-/// - 购买状态管理和事件流
-///
-/// 基础使用（推荐）：
-/// ```dart
-/// // 设置回调（可在 initialize 之前调用）
-/// StorePayManager.instance.setCallbacks(
-///   onPurchaseSuccess: (event) => print('购买成功: ${event.productId}'),
-///   onPurchaseError: (error) => debugPrint('购买失败: ${error.message}'),
-/// );
-///
-/// // 初始化
-/// await StorePayManager.instance.initialize(
-///   config: StorePayConfig(
-///     consumableProductIds: {'coin_100', 'gem_50'},
-///   ),
-///   verifier: (details) async {
-///     // 验证购买逻辑
-///     return true;
-///   },
-/// );
-///
-/// // 查询产品并购买
-/// final products = await StorePayManager.instance.queryProducts(['product_id']);
-/// await StorePayManager.instance.purchaseProduct(products.first);
-/// ```
-///
-/// 平台特定功能：
-/// ```dart
-/// // Google Play 订阅基础计划
-/// final googleExt = StorePayManager.instance.googleExtension;
-/// if (googleExt != null) {
-///   final basePlans = await googleExt.queryBasePlans(['subscription_id']);
-///   await googleExt.purchaseWithOffer(product, offerToken: basePlans.first.offerToken);
-/// }
-///
-/// // Apple Store 多数量购买
-/// final appleExt = StorePayManager.instance.appleExtension;
-/// if (appleExt != null) {
-///   await appleExt.purchaseWithQuantity(product, quantity: 2);
-/// }
-/// ```
-///
 class StorePayManager {
   // ========== 单例实现 ==========
   static final StorePayManager _instance = StorePayManager._internal();
@@ -87,19 +40,14 @@ class StorePayManager {
   // ========== 平台扩展访问器 ==========
 
   /// 获取 Google Play 平台扩展
-  ///
   /// 仅在 Android 平台可用，其他平台返回 null
   GoogleStoreExtension? get googleExtension => _googleExtension;
 
   /// 获取 Apple Store 平台扩展
-  ///
   /// 仅在 iOS 平台可用，其他平台返回 null
   AppleStoreExtension? get appleExtension => _appleExtension;
 
-  /// 当前购买验证器
   PurchaseVerifier? get purchaseVerifier => _purchaseVerifier;
-
-  /// 当前配置
   StorePayConfig get config => _config;
 
   // ========== 状态访问器（委托给平台实现） ==========
@@ -116,7 +64,9 @@ class StorePayManager {
       _platformManager?.isLoadingNotifier ?? ValueNotifier(false);
 
   bool get isLoading => _platformManager?.isLoading ?? false;
-  List<ProductDetails> get products => _platformManager?.products ?? [];
+  
+  /// 当前已缓存的所有商品（已转换为统一格式）
+  List<StoreProductInfo> get products => _platformManager?.products ?? [];
 
   List<PurchaseDetails> get purchasedProducts =>
       _platformManager?.purchasedProducts ?? [];
@@ -131,7 +81,7 @@ class StorePayManager {
   Stream<IAPPurchaseErrorEvent> get purchaseErrorStream =>
       _platformManager?.purchaseErrorStream ?? const Stream.empty();
 
-  Stream<List<ProductDetails>> get productsLoadedStream =>
+  Stream<List<StoreProductInfo>> get productsLoadedStream =>
       _platformManager?.productsLoadedStream ?? const Stream.empty();
 
   Stream<IAPPurchaseEvent> get purchaseRestoredStream =>
@@ -139,20 +89,6 @@ class StorePayManager {
 
   // ========== 核心方法 ==========
 
-  /// 初始化内购管理器
-  ///
-  /// [config] 内购配置（可选，包含自动完成购买、沙盒环境等设置）
-  /// [verifier] 购买验证器（可选，如果已通过 setPurchaseVerifier 设置则无需传入）
-  ///
-  /// 根据当前平台自动创建对应的平台实现
-  ///
-  /// 返回值：初始化是否成功
-  ///
-  /// 注意：
-  /// - 支持链式初始化：`await StorePayManager.instance.initialize(verifier: verifier)`
-  /// - 重复调用会被忽略，只会初始化一次
-  /// - 如果初始化失败，可以重新调用尝试初始化
-  /// - `setCallbacks()` 可在 `initialize()` 之前调用，回调会在初始化后自动注入
   Future<bool> initialize({
     StorePayConfig? config,
     PurchaseVerifier? verifier,
@@ -229,7 +165,6 @@ class StorePayManager {
     return success;
   }
 
-  /// 将缓存的回调注入到平台实现
   void _applyPendingCallbacks() {
     if (_onPurchaseSuccess != null ||
         _onPurchaseError != null ||
@@ -244,94 +179,71 @@ class StorePayManager {
     }
   }
 
-  /// 查询产品信息
-  ///
-  /// [productIds] 产品ID列表
-  ///
-  /// 返回值：查询到的产品列表
-  ///
-  /// 注意：
-  /// - 查询前会自动检查初始化状态
-  /// - 查询结果会缓存到 products 属性中
-  /// - 查询完成后会触发 productsLoadedStream 事件和 onProductsLoaded 回调
-  Future<List<ProductDetails>> queryProducts(List<String> productIds) async {
-    if (_platformManager == null) {
-      debugPrint('[StorePayManager] 内购管理器未初始化，请先调用 initialize()');
-      return [];
-    }
-
-    return await _platformManager!.queryProducts(productIds);
-  }
-
-  /// 查询 Google Play 订阅基础计划
-  ///
-  /// 仅在 Android 平台有效，其他平台返回空列表
-  ///
-  /// [productIds] 订阅产品的ID列表
-  Future<List<SubscriptionOfferInfo>> queryBasePlans(
-    List<String> productIds,
-  ) async {
-    if (_googleExtension == null) {
-      return [];
-    }
-    return await _googleExtension!.queryBasePlans(productIds);
-  }
-
-  /// 购买产品
-  ///
-  /// [productDetails] 要购买的产品详情
-  /// [applicationUserName] 应用自定义用户标识（可选）
-  ///
-  /// 返回值：购买请求是否成功发起
-  ///
-  /// 注意：
-  /// - 返回 true 只表示购买请求成功发起，不代表购买完成
-  /// - 购买结果通过 purchaseSuccessStream/onPurchaseSuccess 或 purchaseErrorStream/onPurchaseError 获取
-  Future<bool> purchaseProduct(
-    ProductDetails productDetails, {
-    String? applicationUserName,
+  /// 查询产品信息，并返回统一化的高级数据结构列表
+  /// [autoRestorePurchases] 若为 true，则在查询商品的同时自动调用 restorePurchases() 同步已购买状态
+  Future<List<StoreProductInfo>> queryProducts(
+    List<String> productIds, {
+    bool autoRestorePurchases = false,
   }) async {
     if (_platformManager == null) {
-      debugPrint('[StorePayManager] 内购管理器未初始化，请先调用 initialize()');
-      return false;
+      debugPrint('[StorePayManager] 未初始化，无法查询产品');
+      return [];
     }
-
-    final username = applicationUserName ?? _config.applicationUserName;
-    return await _platformManager!.purchaseProduct(
-      productDetails,
-      applicationUserName: username,
+    return await _platformManager!.queryProducts(
+      productIds,
+      autoRestorePurchases: autoRestorePurchases,
     );
   }
 
-  /// 恢复购买
-  ///
-  /// 用于恢复用户之前购买过的非消耗型产品或订阅
-  ///
-  /// 注意：
-  /// - 恢复结果通过 purchaseRestoredStream/onPurchaseRestored 获取
-  /// - iOS 平台必须提供恢复购买功能
-  Future<bool> restorePurchases() async {
+  /// 发起购买。
+  /// [offer] 如果你想通过试用/促销入口购买，请传入在此 `StoreProductInfo` 中获取到的 `StoreOfferInfo` 结构。
+  Future<bool> purchaseProduct(
+    StoreProductInfo productInfo, {
+    StoreOfferInfo? offer,
+    String? applicationUserName,
+  }) async {
     if (_platformManager == null) {
-      debugPrint('[StorePayManager] 内购管理器未初始化，请先调用 initialize()');
+      debugPrint('[StorePayManager] 未初始化，无法购买产品');
       return false;
     }
 
+    if (productInfo.isPurchased) {
+      debugPrint('[StorePayManager] 拦截重复购买：${productInfo.title} (${productInfo.nativeProductId}) 已经购买。');
+      _onPurchaseError?.call(IAPPurchaseErrorEvent(
+        message: '您已购买过此商品，无法重复购买。',
+        productId: productInfo.nativeProductId,
+      ));
+      return false;
+    }
+
+    return await _platformManager!.purchaseProduct(
+      productInfo,
+      offer: offer,
+      applicationUserName: applicationUserName,
+    );
+  }
+
+  /// 恢复购买（只恢复非消耗型和订阅型。消耗型因为会自动核销而无法直接恢复）
+  Future<bool> restorePurchases() async {
+    if (_platformManager == null) {
+      debugPrint('[StorePayManager] 未初始化，无法恢复购买');
+      return false;
+    }
     return await _platformManager!.restorePurchases();
   }
 
-  // ========== 辅助方法 ==========
-
-  ProductDetails? getProduct(String productId) {
-    return _platformManager?.getProduct(productId);
+  /// 根据统一ID获取商品
+  StoreProductInfo? getProduct(String unifiedId) {
+    return _platformManager?.getProduct(unifiedId);
   }
 
-  bool hasPurchased(String productId) {
-    return _platformManager?.hasPurchased(productId) ?? false;
+  /// 检查是否已购买过某商品
+  bool hasPurchased(String nativeProductId) {
+    return _platformManager?.hasPurchased(nativeProductId) ?? false;
   }
 
-  /// 设置事件回调
-  ///
-  /// 可在 `initialize()` 之前调用，回调会在初始化完成后自动注入。
+  // ========== 配置注入 ==========
+
   void setCallbacks({
     OnPurchaseSuccess? onPurchaseSuccess,
     OnPurchaseError? onPurchaseError,
@@ -343,29 +255,24 @@ class StorePayManager {
     _onProductsLoaded = onProductsLoaded;
     _onPurchaseRestored = onPurchaseRestored;
 
-    _platformManager?.setCallbacks(
-      onPurchaseSuccess: onPurchaseSuccess,
-      onPurchaseError: onPurchaseError,
-      onProductsLoaded: onProductsLoaded,
-      onPurchaseRestored: onPurchaseRestored,
-    );
+    _applyPendingCallbacks();
   }
 
-  void setPurchaseVerifier(PurchaseVerifier? verifier) {
+  void setPurchaseVerifier(PurchaseVerifier verifier) {
     _purchaseVerifier = verifier;
     _platformManager?.setPurchaseVerifier(verifier);
   }
 
-  /// 释放资源
-  ///
-  /// 释放后可再次调用 `initialize()` 重新初始化。
-  /// 不会清除已设置的 verifier、config 和 callbacks。
+  void setConfig(StorePayConfig config) {
+    _config = config;
+    _platformManager?.setConfig(config);
+  }
+
+  /// 清理资源并断开流监听
   void dispose() {
     _platformManager?.dispose();
     _platformManager = null;
     _googleExtension = null;
     _appleExtension = null;
-
-    debugPrint('[StorePayManager] 已清理资源');
   }
 }

@@ -109,207 +109,100 @@ void main() {
     });
   });
 
-  group('AppleProductType', () {
+  group('StoreProductType', () {
     test('should have all expected values', () {
-      expect(AppleProductType.values.length, equals(5));
-      expect(AppleProductType.consumable, isNotNull);
-      expect(AppleProductType.nonConsumable, isNotNull);
-      expect(AppleProductType.nonRenewable, isNotNull);
-      expect(AppleProductType.autoRenewable, isNotNull);
-      expect(AppleProductType.unknown, isNotNull);
+      expect(StoreProductType.values.length, equals(4));
+      expect(StoreProductType.consumable, isNotNull);
+      expect(StoreProductType.nonConsumable, isNotNull);
+      expect(StoreProductType.subscription, isNotNull);
+      expect(StoreProductType.unknown, isNotNull);
     });
   });
 
-  group('AppleSubscriptionOfferType', () {
+  group('StoreOfferType', () {
     test('should have all expected values', () {
-      expect(AppleSubscriptionOfferType.values.length, equals(4));
-      expect(AppleSubscriptionOfferType.introductory, isNotNull);
-      expect(AppleSubscriptionOfferType.promotional, isNotNull);
-      expect(AppleSubscriptionOfferType.winBack, isNotNull);
-      expect(AppleSubscriptionOfferType.unknown, isNotNull);
+      expect(StoreOfferType.values.length, equals(4));
+      expect(StoreOfferType.introductory, isNotNull);
+      expect(StoreOfferType.promotional, isNotNull);
+      expect(StoreOfferType.freeTrial, isNotNull);
+      expect(StoreOfferType.unknown, isNotNull);
     });
   });
 
-  group('AppleSubscriptionPeriodUnit', () {
+  group('StorePeriodUnit', () {
     test('should have all expected values', () {
-      expect(AppleSubscriptionPeriodUnit.values.length, equals(5));
-      expect(AppleSubscriptionPeriodUnit.day, isNotNull);
-      expect(AppleSubscriptionPeriodUnit.week, isNotNull);
-      expect(AppleSubscriptionPeriodUnit.month, isNotNull);
-      expect(AppleSubscriptionPeriodUnit.year, isNotNull);
-      expect(AppleSubscriptionPeriodUnit.unknown, isNotNull);
+      expect(StorePeriodUnit.values.length, equals(5));
+      expect(StorePeriodUnit.day, isNotNull);
+      expect(StorePeriodUnit.week, isNotNull);
+      expect(StorePeriodUnit.month, isNotNull);
+      expect(StorePeriodUnit.year, isNotNull);
+      expect(StorePeriodUnit.unknown, isNotNull);
     });
   });
 
-  group('SubscriptionOfferInfo', () {
-    test('isBasePlan should return true when offerId is null', () {
-      const offer = SubscriptionOfferInfo(
-        offerId: null,
-        basePlanId: 'base_plan_1',
-        offerTags: [],
-        offerToken: 'token_123',
-        pricingPhases: [],
-      );
-      expect(offer.isBasePlan, isTrue);
-    });
-
-    test('isBasePlan should return false when offerId is set', () {
-      const offer = SubscriptionOfferInfo(
-        offerId: 'offer_1',
-        basePlanId: 'base_plan_1',
-        offerTags: [],
-        offerToken: 'token_123',
-        pricingPhases: [],
-      );
-      expect(offer.isBasePlan, isFalse);
-    });
-
-    test('hasFreeTrial should return true for zero price phase', () {
-      const offer = SubscriptionOfferInfo(
-        offerId: null,
-        basePlanId: 'base_plan_1',
-        offerTags: [],
-        offerToken: 'token_123',
-        pricingPhases: [
-          PricingPhaseInfo(
-            formattedPrice: '免费',
-            priceCurrencyCode: 'CNY',
-            priceAmountMicros: 0,
-            billingCycleCount: 7,
-            billingPeriod: 'P7D',
-            recurrenceMode: 1,
-          ),
-        ],
-      );
-      expect(offer.hasFreeTrial, isTrue);
-    });
-
-    test('hasFreeTrial should return false for non-zero price phase', () {
-      const offer = SubscriptionOfferInfo(
-        offerId: null,
-        basePlanId: 'base_plan_1',
-        offerTags: [],
-        offerToken: 'token_123',
-        pricingPhases: [
-          PricingPhaseInfo(
-            formattedPrice: '¥6.00',
-            priceCurrencyCode: 'CNY',
-            priceAmountMicros: 6000000,
-            billingCycleCount: 1,
-            billingPeriod: 'P1M',
-            recurrenceMode: 2,
-          ),
-        ],
-      );
-      expect(offer.hasFreeTrial, isFalse);
-    });
-
-    test('hasIntroductoryPrice should return true when multiple phases', () {
-      const offer = SubscriptionOfferInfo(
-        offerId: 'offer_1',
-        basePlanId: 'base_plan_1',
-        offerTags: [],
-        offerToken: 'token_123',
-        pricingPhases: [
-          PricingPhaseInfo(
-            formattedPrice: '¥1.00',
-            priceCurrencyCode: 'CNY',
-            priceAmountMicros: 1000000,
-            billingCycleCount: 3,
-            billingPeriod: 'P1M',
-            recurrenceMode: 1,
-          ),
-          PricingPhaseInfo(
-            formattedPrice: '¥6.00',
-            priceCurrencyCode: 'CNY',
-            priceAmountMicros: 6000000,
-            billingCycleCount: 0,
-            billingPeriod: 'P1M',
-            recurrenceMode: 2,
-          ),
-        ],
-      );
-      expect(offer.hasIntroductoryPrice, isTrue);
+  group('StorePaymentMode', () {
+    test('should have all expected values', () {
+      expect(StorePaymentMode.values.length, equals(4));
+      expect(StorePaymentMode.payAsYouGo, isNotNull);
+      expect(StorePaymentMode.payUpFront, isNotNull);
+      expect(StorePaymentMode.freeTrial, isNotNull);
+      expect(StorePaymentMode.unknown, isNotNull);
     });
   });
 
-  group('PricingPhaseInfo', () {
-    test('price getter should convert micros to double', () {
-      const phase = PricingPhaseInfo(
+  group('StorePriceInfo', () {
+    test('should store basic price details', () {
+      const priceInfo = StorePriceInfo(
+        currentPrice: 6.0,
         formattedPrice: '¥6.00',
-        priceCurrencyCode: 'CNY',
-        priceAmountMicros: 6000000,
-        billingCycleCount: 1,
-        billingPeriod: 'P1M',
-        recurrenceMode: 1,
-      );
-      expect(phase.price, equals(6.0));
-    });
-
-    test('isFree should return true for zero price', () {
-      const phase = PricingPhaseInfo(
-        formattedPrice: '免费',
-        priceCurrencyCode: 'CNY',
-        priceAmountMicros: 0,
-        billingCycleCount: 7,
-        billingPeriod: 'P7D',
-        recurrenceMode: 1,
-      );
-      expect(phase.isFree, isTrue);
-    });
-
-    test('isInfiniteRecurring should return true for mode 2', () {
-      const phase = PricingPhaseInfo(
-        formattedPrice: '¥6.00',
-        priceCurrencyCode: 'CNY',
-        priceAmountMicros: 6000000,
-        billingCycleCount: 0,
-        billingPeriod: 'P1M',
-        recurrenceMode: 2,
-      );
-      expect(phase.isInfiniteRecurring, isTrue);
-    });
-
-    test('isFiniteRecurring should return true for mode 1 with count > 0', () {
-      const phase = PricingPhaseInfo(
-        formattedPrice: '¥1.00',
-        priceCurrencyCode: 'CNY',
-        priceAmountMicros: 1000000,
-        billingCycleCount: 3,
-        billingPeriod: 'P1M',
-        recurrenceMode: 1,
-      );
-      expect(phase.isFiniteRecurring, isTrue);
-    });
-  });
-
-  group('InstallmentPlanInfo', () {
-    test('should store installment details', () {
-      const plan = InstallmentPlanInfo(
-        commitmentPaymentsCount: 3,
-        subsequentCommitmentPaymentsCount: 9,
-      );
-      expect(plan.commitmentPaymentsCount, equals(3));
-      expect(plan.subsequentCommitmentPaymentsCount, equals(9));
-    });
-  });
-
-  group('AppleProductInfo', () {
-    test('should store product info', () {
-      const productInfo = AppleProductInfo(
-        productId: 'product_001',
-        title: 'VIP Subscription',
-        description: 'Monthly VIP subscription',
-        displayPrice: '¥6.00',
-        rawPrice: 6.0,
         currencyCode: 'CNY',
         currencySymbol: '¥',
-        productType: AppleProductType.autoRenewable,
-        subscriptionInfo: null,
       );
-      expect(productInfo.productId, equals('product_001'));
+      expect(priceInfo.currentPrice, equals(6.0));
+      expect(priceInfo.formattedPrice, equals('¥6.00'));
+      expect(priceInfo.currencyCode, equals('CNY'));
+      expect(priceInfo.currencySymbol, equals('¥'));
+      expect(priceInfo.symbolBeforePrice, equals(true));
+      expect(priceInfo.pricePerMonth, isNull);
+    });
+  });
+
+  group('StorePeriod', () {
+    test('should store period details', () {
+      const period = StorePeriod(value: 1, unit: StorePeriodUnit.month);
+      expect(period.value, equals(1));
+      expect(period.unit, equals(StorePeriodUnit.month));
+    });
+  });
+
+  group('StoreProductInfo', () {
+    test('should store basic product details', () {
+      final productInfo = StoreProductInfo(
+        id: 'product_001',
+        nativeProductId: 'product_001',
+        title: 'VIP Subscription',
+        description: 'Monthly VIP subscription',
+        type: StoreProductType.subscription,
+        priceInfo: const StorePriceInfo(
+          currentPrice: 6.0,
+          formattedPrice: '¥6.00',
+          currencyCode: 'CNY',
+          currencySymbol: '¥',
+        ),
+        rawDetails: ProductDetails(
+          id: 'product_001',
+          title: 'VIP Subscription',
+          description: 'Monthly VIP subscription',
+          price: '¥6.00',
+          rawPrice: 6.0,
+          currencyCode: 'CNY',
+          currencySymbol: '¥',
+        ),
+      );
+      expect(productInfo.id, equals('product_001'));
       expect(productInfo.title, equals('VIP Subscription'));
-      expect(productInfo.productType, equals(AppleProductType.autoRenewable));
+      expect(productInfo.type, equals(StoreProductType.subscription));
+      expect(productInfo.priceInfo.currentPrice, equals(6.0));
     });
   });
 }

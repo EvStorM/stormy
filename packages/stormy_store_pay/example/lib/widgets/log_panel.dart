@@ -35,3 +35,48 @@ class LogHeader extends StatelessWidget {
     );
   }
 }
+
+/// 日志面板区域
+class LogPanel extends StatelessWidget {
+  final List<String> logs;
+  final VoidCallback onClear;
+
+  const LogPanel({super.key, required this.logs, required this.onClear});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      flex: 1,
+      child: Column(
+        children: [
+          LogHeader(
+            count: logs.length,
+            onClear: onClear,
+          ),
+          Expanded(
+            child: Container(
+              color: Colors.black87,
+              child: ListView.builder(
+                padding: const EdgeInsets.all(8),
+                itemCount: logs.length,
+                itemBuilder: (context, index) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Text(
+                      logs[index],
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        fontSize: 10,
+                        color: Colors.greenAccent,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

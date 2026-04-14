@@ -7,6 +7,7 @@ import 'package:in_app_purchase_android/in_app_purchase_android.dart';
 import '../store_pay_base.dart';
 import '../store_pay_config.dart';
 import '../store_pay_types.dart';
+import '../utils/store_product_mapper.dart';
 
 /// Google Play 内购管理器实现
 class GoogleStoreManager implements StorePayManagerBase {
@@ -15,6 +16,14 @@ class GoogleStoreManager implements StorePayManagerBase {
 
   // ========== 配置 ==========
   StorePayConfig _config = StorePayConfig.defaultConfig;
+  late final StoreProductMapper _mapper;
+  final Set<String> _consumableIds = {};
+
+  GoogleStoreManager() {
+    _mapper = StoreProductMapper(
+      isConsumable: _isConsumableProductById,
+    );
+  }
 
   // ========== 状态管理 ==========
   final ValueNotifier<IAPStatus> _statusNotifier = ValueNotifier(
@@ -22,8 +31,10 @@ class GoogleStoreManager implements StorePayManagerBase {
   );
   bool _isAvailable = false;
   final ValueNotifier<bool> _isLoadingNotifier = ValueNotifier(false);
-  final Map<String, ProductDetails> _productCache = {};
-  final Set<String> _consumableIds = {};
+  
+  // 缓存统一格式的商品。对于 Android，键是 `${productId}:${basePlanId}`，普通应用内商品是 `${productId}`
+  final Map<String, StoreProductInfo> _productCache = {};
+  
   final List<PurchaseDetails> _purchases = [];
   String? _errorMessage;
 
@@ -32,8 +43,8 @@ class GoogleStoreManager implements StorePayManagerBase {
       StreamController<IAPPurchaseEvent>.broadcast();
   final StreamController<IAPPurchaseErrorEvent> _purchaseErrorController =
       StreamController<IAPPurchaseErrorEvent>.broadcast();
-  final StreamController<List<ProductDetails>> _productsLoadedController =
-      StreamController<List<ProductDetails>>.broadcast();
+  final StreamController<List<StoreProductInfo>> _productsLoadedController =
+      StreamController<List<StoreProductInfo>>.broadcast();
   final StreamController<IAPPurchaseEvent> _purchaseRestoredController =
       StreamController<IAPPurchaseEvent>.broadcast();
 
@@ -72,8 +83,8 @@ class GoogleStoreManager implements StorePayManagerBase {
   bool get isLoading => _isLoadingNotifier.value;
 
   @override
-  List<ProductDetails> get products =>
-      List<ProductDetails>.unmodifiable(_productCache.values);
+  List<StoreProductInfo> get products =>
+      List<StoreProductInfo>.unmodifiable(_productCache.values);
 
   @override
   List<PurchaseDetails> get purchasedProducts => List.unmodifiable(_purchases);
@@ -90,7 +101,7 @@ class GoogleStoreManager implements StorePayManagerBase {
       _purchaseErrorController.stream;
 
   @override
-  Stream<List<ProductDetails>> get productsLoadedStream =>
+  Stream<List<StoreProductInfo>> get productsLoadedStream =>
       _productsLoadedController.stream;
 
   @override
@@ -99,16 +110,12 @@ class GoogleStoreManager implements StorePayManagerBase {
 
   // ========== 配置注入 ==========
 
-  /// 注入配置（由 StorePayManager 在初始化时调用）
+  @override
   void setConfig(StorePayConfig config) {
     _config = config;
     _consumableIds.addAll(config.consumableProductIds);
   }
 
-  /// 注册消耗型产品ID
-  ///
-  /// Google Play 无法从产品信息自动推断商品类型，
-  /// 必须通过此方法或 [StorePayConfig.consumableProductIds] 显式注册。
   void registerConsumableIds(Set<String> consumableIds) {
     _consumableIds.addAll(consumableIds);
   }
@@ -164,13 +171,20 @@ class GoogleStoreManager implements StorePayManagerBase {
   }
 
   @override
-  Future<List<ProductDetails>> queryProducts(List<String> productIds) async {
+  Future<List<StoreProductInfo>> queryProducts(
+    List<String> productIds, {
+    bool autoRestorePurchases = false,
+  }) async {
     if (!_checkInitialized()) return [];
+
+    if (autoRestorePurchases) {
+      await restorePurchases();
+    }
 
     return await _runWithLoading(() => _performQueryProducts(productIds));
   }
 
-  Future<List<ProductDetails>> _performQueryProducts(
+  Future<List<StoreProductInfo>> _performQueryProducts(
     List<String> productIds,
   ) async {
     try {
@@ -183,16 +197,11 @@ class GoogleStoreManager implements StorePayManagerBase {
         return [];
       }
 
-      for (final product in response.productDetails) {
-        _productCache[product.id] = product;
-      }
-
-      final products = List<ProductDetails>.unmodifiable(
-        _productCache.values,
-      );
-      _notifyProductsLoaded(products);
-      debugPrint('[Google Play] 查询到 ${response.productDetails.length} 个产品');
-      return products;
+      final unifiedProducts = _mapper.mapProducts(response.productDetails);
+      cacheProducts(unifiedProducts, notifyListeners: true);
+      
+      debugPrint('[Google Play] 查询到 ${response.productDetails.length} 个基础产品模型，扁平化展开后共 ${unifiedProducts.length} 个展平项');
+      return unifiedProducts;
     } catch (e) {
       _notifyPurchaseError(_buildErrorEvent('查询产品失败: $e'));
       return [];
@@ -201,20 +210,24 @@ class GoogleStoreManager implements StorePayManagerBase {
 
   @override
   Future<bool> purchaseProduct(
-    ProductDetails productDetails, {
+    StoreProductInfo productInfo, {
+    StoreOfferInfo? offer,
     String? applicationUserName,
   }) async {
     if (!_checkInitialized()) return false;
 
     try {
-      final isConsumable = _isConsumableProduct(productDetails.id);
+      final isConsumable = productInfo.type == StoreProductType.consumable;
+      final token = offer?.id ?? productInfo.googleDefaultOfferToken;
+
       final purchaseParam = GooglePlayPurchaseParam(
-        productDetails: productDetails,
+        productDetails: productInfo.rawDetails,
         applicationUserName: applicationUserName,
+        offerToken: token,
       );
 
       debugPrint(
-        '[Google Play] 购买${isConsumable ? "消耗型" : "非消耗型/订阅"}产品: ${productDetails.id}',
+        '[Google Play] 购买${isConsumable ? "消耗型" : "非消耗型/订阅"}产品: ${productInfo.id}, Token: $token',
       );
 
       final result = isConsumable
@@ -226,7 +239,7 @@ class GoogleStoreManager implements StorePayManagerBase {
 
       if (!result) {
         _notifyPurchaseError(
-          _buildErrorEvent('购买请求失败', productId: productDetails.id),
+          _buildErrorEvent('购买请求失败', productId: productInfo.nativeProductId),
         );
         return false;
       }
@@ -235,7 +248,7 @@ class GoogleStoreManager implements StorePayManagerBase {
       return true;
     } catch (e) {
       _notifyPurchaseError(
-        _buildErrorEvent('购买失败: $e', productId: productDetails.id, cause: e),
+        _buildErrorEvent('购买失败: $e', productId: productInfo.nativeProductId, cause: e),
       );
       return false;
     }
@@ -257,16 +270,31 @@ class GoogleStoreManager implements StorePayManagerBase {
     });
   }
 
-  @override
-  ProductDetails? getProduct(String productId) {
-    return _productCache[productId];
+  void cacheProducts(
+    List<StoreProductInfo> products, {
+    bool notifyListeners = false,
+  }) {
+    if (products.isEmpty) return;
+
+    for (final product in products) {
+      _productCache[product.id] = product;
+    }
+
+    if (notifyListeners) {
+      _notifyProductsLoaded(products);
+    }
   }
 
   @override
-  bool hasPurchased(String productId) {
+  StoreProductInfo? getProduct(String unifiedId) {
+    return _productCache[unifiedId];
+  }
+
+  @override
+  bool hasPurchased(String nativeProductId) {
     return _purchases.any(
       (purchase) =>
-          purchase.productID == productId &&
+          purchase.productID == nativeProductId &&
           (purchase.status == PurchaseStatus.purchased ||
               purchase.status == PurchaseStatus.restored),
     );
@@ -338,7 +366,7 @@ class GoogleStoreManager implements StorePayManagerBase {
     );
   }
 
-  void _notifyProductsLoaded(List<ProductDetails> products) {
+  void _notifyProductsLoaded(List<StoreProductInfo> products) {
     _productsLoadedController.add(products);
     onProductsLoaded?.call(products);
   }
@@ -379,9 +407,12 @@ class GoogleStoreManager implements StorePayManagerBase {
 
   // ========== 内部处理方法 ==========
 
-  /// 通过注册的消耗型 ID 判断，默认为非消耗型
-  bool _isConsumableProduct(String productId) {
+  bool _isConsumableProductById(String productId) {
     return _consumableIds.contains(productId);
+  }
+
+  bool _isConsumablePurchase(PurchaseDetails details) {
+    return _isConsumableProductById(details.productID);
   }
 
   Future<void> _handlePurchaseUpdates(
@@ -415,7 +446,6 @@ class GoogleStoreManager implements StorePayManagerBase {
           break;
       }
 
-      // 仅在 autoCompletePurchases 为 true 时自动完成购买
       if (_config.autoCompletePurchases &&
           purchaseDetails.pendingCompletePurchase) {
         await _inAppPurchase.completePurchase(purchaseDetails);
@@ -436,7 +466,7 @@ class GoogleStoreManager implements StorePayManagerBase {
       }
 
       _upsertPurchase(purchaseDetails);
-      final isConsumable = _isConsumableProduct(purchaseDetails.productID);
+      final isConsumable = _isConsumablePurchase(purchaseDetails);
 
       if (isConsumable) {
         await _handleConsumablePurchase(purchaseDetails);
@@ -484,7 +514,7 @@ class GoogleStoreManager implements StorePayManagerBase {
     PurchaseDetails purchaseDetails,
   ) async {
     debugPrint('[Google Play] 消耗型产品购买处理: ${purchaseDetails.productID}');
-    // 消耗型产品需要手动消耗，通过 GoogleStoreExtension.consumePurchase() 调用
+    // 消耗型产品需手动消耗，通过 GoogleStoreExtension.consumePurchase() 
   }
 
   Future<bool> _runPurchaseVerification(PurchaseDetails purchaseDetails) async {
@@ -508,7 +538,6 @@ class GoogleStoreManager implements StorePayManagerBase {
 
   // ========== 内部辅助方法 ==========
 
-  /// 等待初始化完成（默认 30 秒超时）
   Future<void> _waitForInitialization() async {
     final deadline = DateTime.now().add(const Duration(seconds: 30));
     await Future.doWhile(() async {

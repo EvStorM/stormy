@@ -3,15 +3,13 @@ import 'package:stormy_store_pay/stormy_store_pay.dart';
 
 /// 产品卡片
 class ProductCard extends StatelessWidget {
-  final ProductDetails product;
-  final AppleProductInfo? appleInfo;
+  final StoreProductInfo product;
   final VoidCallback onPurchase;
   final VoidCallback onViewDetail;
 
   const ProductCard({
     super.key,
     required this.product,
-    this.appleInfo,
     required this.onPurchase,
     required this.onViewDetail,
   });
@@ -19,15 +17,16 @@ class ProductCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final subInfo = appleInfo?.subscriptionInfo;
-    final hasOffers = (subInfo?.promotionalOffers.isNotEmpty ?? false);
+    final subInfo = product.subscriptionInfo;
+    final hasOffers = product.offers.isNotEmpty;
+    final isConsumable = product.type == StoreProductType.consumable;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
+        side: BorderSide(color: cs.outlineVariant.withAlpha(128)),
       ),
       child: InkWell(
         onTap: onViewDetail,
@@ -54,7 +53,7 @@ class ProductCard extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        if (hasOffers) ...[
+                        if (product.isPurchased) ...[
                           const SizedBox(width: 6),
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -62,7 +61,26 @@ class ProductCard extends StatelessWidget {
                               vertical: 1,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.amber.withValues(alpha: 0.15),
+                              color: Colors.green.withAlpha(38),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              '已拥有',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.green.shade800,
+                              ),
+                            ),
+                          ),
+                        ] else if (hasOffers) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 1,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.withAlpha(38),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
@@ -70,6 +88,26 @@ class ProductCard extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 10,
                                 color: Colors.amber.shade800,
+                              ),
+                            ),
+                          ),
+                        ],
+                        if (isConsumable) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 1,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.withAlpha(38),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              '直充', // 消耗品
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.blue.shade800,
                               ),
                             ),
                           ),
@@ -91,13 +129,28 @@ class ProductCard extends StatelessWidget {
                       product.id,
                       style: TextStyle(
                         fontSize: 10,
-                        color: cs.onSurfaceVariant.withValues(alpha: 0.6),
+                        color: cs.onSurfaceVariant.withAlpha(153),
                         fontFamily: 'monospace',
                       ),
                     ),
                     if (subInfo != null) ...[
                       const SizedBox(height: 4),
-                      _SubscriptionBadge(info: subInfo),
+                      _SubscriptionBadge(
+                        info: subInfo,
+                        offersText: hasOffers
+                            ? '${product.offers.length} 个优惠'
+                            : null,
+                      ),
+                      if (subInfo.googleBasePlanId != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'BasePlan: ${subInfo.googleBasePlanId}',
+                          style: TextStyle(
+                            fontSize: 9,
+                            color: Colors.indigo.shade400,
+                          ),
+                        ),
+                      ],
                     ],
                   ],
                 ),
@@ -108,7 +161,7 @@ class ProductCard extends StatelessWidget {
               Column(
                 children: [
                   FilledButton(
-                    onPressed: onPurchase,
+                    onPressed: product.isPurchased ? null : onPurchase,
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 14,
@@ -120,14 +173,33 @@ class ProductCard extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    child: Text(product.price),
+                    child: Text(
+                      product.isPurchased
+                          ? '已拥有'
+                          : product.priceInfo.formattedPrice,
+                    ),
                   ),
-                  const SizedBox(height: 4),
-                  Icon(
-                    Icons.chevron_right,
-                    size: 16,
-                    color: cs.onSurfaceVariant.withValues(alpha: 0.4),
-                  ),
+                  if (!product.isPurchased &&
+                      product.priceInfo.pricePerMonth != null &&
+                      product.priceInfo.pricePerMonth! <
+                          product.priceInfo.currentPrice) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      '约 ${product.priceInfo.currencySymbol}${product.priceInfo.pricePerMonth!.toStringAsFixed(2)}/月',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: cs.onSurfaceVariant.withAlpha(153),
+                      ),
+                    ),
+                  ],
+                  if (!product.isPurchased) ...[
+                    const SizedBox(height: 4),
+                    Icon(
+                      Icons.chevron_right,
+                      size: 16,
+                      color: cs.onSurfaceVariant.withAlpha(102),
+                    ),
+                  ],
                 ],
               ),
             ],
@@ -141,16 +213,17 @@ class ProductCard extends StatelessWidget {
 // ========== 订阅周期标签 ==========
 
 class _SubscriptionBadge extends StatelessWidget {
-  final AppleSubscriptionInfo info;
+  final StoreSubscriptionInfo info;
+  final String? offersText;
 
-  const _SubscriptionBadge({required this.info});
+  const _SubscriptionBadge({required this.info, this.offersText});
 
-  String _periodText(AppleSubscriptionPeriodInfo p) {
+  String _periodText(StorePeriod p) {
     final unitStr = switch (p.unit) {
-      AppleSubscriptionPeriodUnit.day => '天',
-      AppleSubscriptionPeriodUnit.week => '周',
-      AppleSubscriptionPeriodUnit.month => '月',
-      AppleSubscriptionPeriodUnit.year => '年',
+      StorePeriodUnit.day => '天',
+      StorePeriodUnit.week => '周',
+      StorePeriodUnit.month => '月',
+      StorePeriodUnit.year => '年',
       _ => '?',
     };
     return '${p.value}$unitStr';
@@ -168,20 +241,20 @@ class _SubscriptionBadge extends StatelessWidget {
             borderRadius: BorderRadius.circular(4),
           ),
           child: Text(
-            '周期: ${_periodText(info.subscriptionPeriod)}',
+            '周期: ${_periodText(info.period)}',
             style: TextStyle(fontSize: 10, color: cs.onPrimaryContainer),
           ),
         ),
-        if (info.promotionalOffers.isNotEmpty) ...[
+        if (offersText != null) ...[
           const SizedBox(width: 4),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              color: Colors.orange.withValues(alpha: 0.12),
+              color: Colors.orange.withAlpha(30),
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(
-              '${info.promotionalOffers.length} 个优惠',
+              offersText!,
               style: TextStyle(fontSize: 10, color: Colors.orange.shade700),
             ),
           ),

@@ -10,281 +10,262 @@ export 'store_pay_events.dart'
         PurchaseDetailsTransactionExtension;
 
 /// 内购状态枚举
-enum IAPStatus {
-  /// 未初始化
-  uninitialized,
-
-  /// 初始化中
-  initializing,
-
-  /// 已初始化
-  initialized,
-
-  /// 初始化失败
-  initializeFailed,
-}
+enum IAPStatus { uninitialized, initializing, initialized, initializeFailed }
 
 /// 平台类型枚举
-enum IAPPlatform {
-  /// Google Play
-  google,
-
-  /// Apple App Store
-  apple,
-
-  /// 不支持的平台
-  unsupported,
-}
+enum IAPPlatform { google, apple, unsupported }
 
 /// 购买生命周期状态
-enum IAPPurchaseLifecycle {
-  /// 首次购买成功
-  purchased,
+enum IAPPurchaseLifecycle { purchased, restored, pending }
 
-  /// 恢复历史购买
-  restored,
+// ========== 回调 ==========
 
-  /// 处于等待完成状态
-  pending,
-}
-
-/// 购买成功回调
 typedef OnPurchaseSuccess = void Function(IAPPurchaseEvent event);
-
-/// 购买错误回调
 typedef OnPurchaseError = void Function(IAPPurchaseErrorEvent event);
-
-/// 产品加载完成回调
-typedef OnProductsLoaded = void Function(List<ProductDetails> products);
-
-/// 购买恢复完成回调
+typedef OnProductsLoaded = void Function(List<StoreProductInfo> products);
 typedef OnPurchaseRestored = void Function(IAPPurchaseEvent event);
-
-/// 购买验证函数
 typedef PurchaseVerifier =
     Future<bool> Function(PurchaseDetails purchaseDetails);
 
-// ========== Google Play 特定类型 ==========
+// ========== 统一抽象商品体系 ==========
 
-/// Google Play 订阅优惠信息
-class SubscriptionOfferInfo {
-  final String? offerId;
-  final String basePlanId;
-  final List<String> offerTags;
-  final String offerToken;
-  final List<PricingPhaseInfo> pricingPhases;
-  final InstallmentPlanInfo? installmentPlanDetails;
-
-  const SubscriptionOfferInfo({
-    this.offerId,
-    required this.basePlanId,
-    required this.offerTags,
-    required this.offerToken,
-    required this.pricingPhases,
-    this.installmentPlanDetails,
-  });
-
-  factory SubscriptionOfferInfo.fromWrapper(dynamic subscriptionOfferDetails) {
-    return SubscriptionOfferInfo(
-      offerId: subscriptionOfferDetails.offerId,
-      basePlanId: subscriptionOfferDetails.basePlanId,
-      offerTags: List<String>.from(subscriptionOfferDetails.offerTags),
-      offerToken: subscriptionOfferDetails.offerIdToken,
-      pricingPhases: (subscriptionOfferDetails.pricingPhases as List)
-          .map((phase) => PricingPhaseInfo.fromWrapper(phase))
-          .toList(),
-      installmentPlanDetails:
-          subscriptionOfferDetails.installmentPlanDetails != null
-          ? InstallmentPlanInfo.fromWrapper(
-              subscriptionOfferDetails.installmentPlanDetails,
-            )
-          : null,
-    );
-  }
-
-  bool get isBasePlan => offerId == null;
-  bool get hasFreeTrial =>
-      pricingPhases.isNotEmpty && pricingPhases.first.priceAmountMicros == 0;
-  bool get hasIntroductoryPrice => pricingPhases.length > 1;
-
-  @override
-  String toString() {
-    return 'SubscriptionOfferInfo('
-        'offerId: $offerId, '
-        'basePlanId: $basePlanId, '
-        'offerTags: $offerTags, '
-        'offerToken: $offerToken, '
-        'pricingPhases: ${pricingPhases.length}, '
-        'installmentPlanDetails: $installmentPlanDetails'
-        ')';
-  }
-}
-
-/// 定价阶段信息
-class PricingPhaseInfo {
-  final String formattedPrice;
-  final String priceCurrencyCode;
-  final int priceAmountMicros;
-  final int billingCycleCount;
-  final String billingPeriod;
-  final int recurrenceMode;
-
-  const PricingPhaseInfo({
-    required this.formattedPrice,
-    required this.priceCurrencyCode,
-    required this.priceAmountMicros,
-    required this.billingCycleCount,
-    required this.billingPeriod,
-    required this.recurrenceMode,
-  });
-
-  factory PricingPhaseInfo.fromWrapper(dynamic pricingPhase) {
-    final recurrenceModeValue = pricingPhase.recurrenceMode is int
-        ? pricingPhase.recurrenceMode
-        : (pricingPhase.recurrenceMode.index + 1);
-
-    return PricingPhaseInfo(
-      formattedPrice: pricingPhase.formattedPrice,
-      priceCurrencyCode: pricingPhase.priceCurrencyCode,
-      priceAmountMicros: pricingPhase.priceAmountMicros,
-      billingCycleCount: pricingPhase.billingCycleCount,
-      billingPeriod: pricingPhase.billingPeriod,
-      recurrenceMode: recurrenceModeValue,
-    );
-  }
-
-  double get price => priceAmountMicros / 1000000.0;
-  bool get isFree => priceAmountMicros == 0;
-  bool get isInfiniteRecurring => recurrenceMode == 2;
-  bool get isFiniteRecurring => recurrenceMode == 1 && billingCycleCount > 0;
-
-  @override
-  String toString() {
-    return 'PricingPhaseInfo('
-        'formattedPrice: $formattedPrice, '
-        'priceCurrencyCode: $priceCurrencyCode, '
-        'priceAmountMicros: $priceAmountMicros, '
-        'billingCycleCount: $billingCycleCount, '
-        'billingPeriod: $billingPeriod, '
-        'recurrenceMode: $recurrenceMode'
-        ')';
-  }
-}
-
-/// 分期付款计划信息
-class InstallmentPlanInfo {
-  final int commitmentPaymentsCount;
-  final int subsequentCommitmentPaymentsCount;
-
-  const InstallmentPlanInfo({
-    required this.commitmentPaymentsCount,
-    required this.subsequentCommitmentPaymentsCount,
-  });
-
-  factory InstallmentPlanInfo.fromWrapper(dynamic installmentPlanDetails) {
-    return InstallmentPlanInfo(
-      commitmentPaymentsCount:
-          installmentPlanDetails.commitmentPaymentsCount ?? 0,
-      subsequentCommitmentPaymentsCount:
-          installmentPlanDetails.subsequentCommitmentPaymentsCount ?? 0,
-    );
-  }
-
-  @override
-  String toString() {
-    return 'InstallmentPlanInfo('
-        'commitmentPaymentsCount: $commitmentPaymentsCount, '
-        'subsequentCommitmentPaymentsCount: $subsequentCommitmentPaymentsCount'
-        ')';
-  }
-}
-
-// ========== Apple 特定类型 ==========
-
-/// Apple 平台商品类型
-enum AppleProductType {
+/// 统一商品类型
+enum StoreProductType {
   consumable,
   nonConsumable,
-  nonRenewable,
-  autoRenewable,
+  subscription, // 对应 autoRenewable, nonRenewable 或 Google 的 sub
   unknown,
 }
 
-/// Apple 平台订阅优惠类型
-enum AppleSubscriptionOfferType { introductory, promotional, winBack, unknown }
+/// 统一计费周期单位
+enum StorePeriodUnit { day, week, month, year, unknown }
 
-/// Apple 平台订阅优惠扣费模式
-enum AppleSubscriptionOfferPaymentMode {
-  payAsYouGo,
-  payUpFront,
-  freeTrial,
-  unknown,
-}
-
-/// Apple 平台订阅周期单位
-enum AppleSubscriptionPeriodUnit { day, week, month, year, unknown }
-
-/// Apple 平台订阅周期信息
-class AppleSubscriptionPeriodInfo {
+/// 统一计费周期
+class StorePeriod {
   final int value;
-  final AppleSubscriptionPeriodUnit unit;
+  final StorePeriodUnit unit;
 
-  const AppleSubscriptionPeriodInfo({required this.value, required this.unit});
+  const StorePeriod({required this.value, required this.unit});
+
+  @override
+  String toString() {
+    final String unitStr;
+    switch (unit) {
+      case StorePeriodUnit.day:
+        unitStr = '天';
+        break;
+      case StorePeriodUnit.week:
+        unitStr = '周';
+        break;
+      case StorePeriodUnit.month:
+        unitStr = '个月';
+        break;
+      case StorePeriodUnit.year:
+        unitStr = '年';
+        break;
+      case StorePeriodUnit.unknown:
+        unitStr = '未知周期';
+        break;
+    }
+    return '$value $unitStr';
+  }
 }
 
-/// Apple 平台订阅优惠信息
-class AppleSubscriptionOfferInfo {
-  final String? id;
-  final double price;
-  final AppleSubscriptionOfferType type;
-  final AppleSubscriptionPeriodInfo period;
-  final int periodCount;
-  final AppleSubscriptionOfferPaymentMode paymentMode;
+/// 统一价格信息
+class StorePriceInfo {
+  /// 实际金额 (e.g. 9.99)
+  final double currentPrice;
 
-  const AppleSubscriptionOfferInfo({
-    required this.id,
-    required this.price,
-    required this.type,
-    required this.period,
-    required this.periodCount,
-    required this.paymentMode,
-  });
-}
+  /// 原价 (e.g. 19.99) - 可选，用于展示优惠划线价
+  final double? originalPrice;
 
-/// Apple 平台订阅详情
-class AppleSubscriptionInfo {
-  final String subscriptionGroupId;
-  final AppleSubscriptionPeriodInfo subscriptionPeriod;
-  final List<AppleSubscriptionOfferInfo> promotionalOffers;
+  /// 本地化货币字符金额 (e.g. "$9.99" 或 "¥9.99")
+  final String formattedPrice;
 
-  const AppleSubscriptionInfo({
-    required this.subscriptionGroupId,
-    required this.subscriptionPeriod,
-    required this.promotionalOffers,
-  });
-}
-
-/// Apple 平台商品详情
-class AppleProductInfo {
-  final String productId;
-  final String title;
-  final String description;
-  final String displayPrice;
-  final double rawPrice;
+  /// 货币代码 (e.g. "USD", "CNY", "HKD")
   final String currencyCode;
-  final String currencySymbol;
-  final AppleProductType productType;
-  final AppleSubscriptionInfo? subscriptionInfo;
 
-  const AppleProductInfo({
-    required this.productId,
-    required this.title,
-    required this.description,
-    required this.displayPrice,
-    required this.rawPrice,
+  /// 货币符号 (e.g. "$", "¥")
+  final String currencySymbol;
+
+  /// 货币符号是否在价格前面 (e.g. $9.99 -> true, 9.99€ -> false)
+  final bool symbolBeforePrice;
+
+  /// 根据当前价格与周期计算出的日均价
+  final double? pricePerDay;
+
+  /// 根据当前价格与周期计算出的周均价 (基于 52周/年)
+  final double? pricePerWeek;
+
+  /// 根据当前价格与周期计算出的月均价 (基于 12月/年)
+  final double? pricePerMonth;
+
+  /// 根据当前价格与周期计算出的年均价 (基于 365天/年)
+  final double? pricePerYear;
+
+  const StorePriceInfo({
+    required this.currentPrice,
+    this.originalPrice,
+    required this.formattedPrice,
     required this.currencyCode,
     required this.currencySymbol,
-    required this.productType,
-    this.subscriptionInfo,
+    this.symbolBeforePrice = true,
+    this.pricePerDay,
+    this.pricePerWeek,
+    this.pricePerMonth,
+    this.pricePerYear,
   });
+
+  @override
+  String toString() => '$formattedPrice ($currencyCode)';
+}
+
+/// 统一订阅优惠类型
+enum StoreOfferType {
+  freeTrial, // 免费试用
+  introductory, // 首次购买特惠
+  promotional, // 针对特定目标用户/条件优惠
+  unknown,
+}
+
+/// 统一订阅及优惠支付模式
+enum StorePaymentMode {
+  payAsYouGo, // 分期支付当前优惠价
+  payUpFront, // 预付全款
+  freeTrial, // 免费
+  unknown,
+}
+
+/// 统一优惠信息
+class StoreOfferInfo {
+  /// 优惠/阶段 ID 或者 Token
+  final String id;
+  final StoreOfferType type;
+  final StorePriceInfo priceInfo;
+  final StorePeriod period;
+  final StorePaymentMode paymentMode;
+
+  /// 该优惠适用的周期次数 (例如: 享受前3个月优惠 -> 3)
+  final int paymentCount;
+
+  const StoreOfferInfo({
+    required this.id,
+    required this.type,
+    required this.priceInfo,
+    required this.period,
+    required this.paymentMode,
+    required this.paymentCount,
+  });
+}
+
+/// 统一订阅信息
+class StoreSubscriptionInfo {
+  /// 原生订阅组 ID（Apple 为 subscriptionGroupIdentifier，Google 通常即为 productId）
+  final String groupId;
+
+  /// 基本订阅周期
+  final StorePeriod period;
+
+  /// (Apple 特定) Apple 的订阅优惠列表
+  final List<StoreOfferInfo>? applePromotionalOffers;
+
+  /// (Google 特定) 对应的 Base Plan ID
+  final String? googleBasePlanId;
+
+  /// (Google 特定) Base Plan 的标签，用于在 UI 上决定是否标记“推荐”或“特惠”
+  final List<String>? googleOfferTags;
+
+  const StoreSubscriptionInfo({
+    required this.groupId,
+    required this.period,
+    this.applePromotionalOffers,
+    this.googleBasePlanId,
+    this.googleOfferTags,
+  });
+}
+
+/// 统一对外展示的可购买商品信息
+///
+/// 重要区别：
+/// 在该封装模型中，此对象代表“一个可以展示在 UI 并进行购买的独立项”！
+/// 对于 iOS，它通常与底层的 `SKProduct` 一一对应；
+/// 对于 Android (Play Billing V5+) 的订阅，一个底层的 `ProductDetails` 会被 **扁平化** 展平为多个 `StoreProductInfo`，
+/// 每个 `StoreProductInfo` 对应底层的一个 Base Plan。这样可以极大简化双平台兼容的 UI 编写。
+class StoreProductInfo {
+  /// 商品全局唯一标识。
+  /// Apple 下通常为 productId；
+  /// Google 普通商品下为 productId，Google 订阅商品下由于扁平化，格式约定为 `[productId]:[basePlanId]` 以区分。
+  final String id;
+
+  /// 原生商品 ID (Apple/Google 的 productId)
+  final String nativeProductId;
+
+  final String title;
+  final String description;
+  final StoreProductType type;
+  final StorePriceInfo priceInfo;
+
+  /// 只有订阅商品才会存在该字段
+  final StoreSubscriptionInfo? subscriptionInfo;
+
+  /// 与该商品或基础套餐绑定的各类优惠（包含新人首月减免、免费试用等）
+  final List<StoreOfferInfo> offers;
+
+  /// 底层原始数据，以备高级需求直接读取使用
+  final ProductDetails rawDetails;
+
+  /// (Google 特定) 购买当前基础套餐必备的凭证！如果没有则说明非订阅
+  final String? googleDefaultOfferToken;
+
+  const StoreProductInfo({
+    required this.id,
+    required this.nativeProductId,
+    required this.title,
+    required this.description,
+    required this.type,
+    required this.priceInfo,
+    this.subscriptionInfo,
+    this.offers = const [],
+    required this.rawDetails,
+    this.googleDefaultOfferToken,
+  });
+
+  /// 是否已经购买过（针对非消耗型和订阅型）。
+  /// 自动判断：调用 `StorePayManager.instance.hasPurchased(nativeProductId)` 获取最新状态。
+  bool get isPurchased {
+    if (type == StoreProductType.nonConsumable ||
+        type == StoreProductType.subscription) {
+      return StorePayManager.instance.hasPurchased(nativeProductId);
+    }
+    return false;
+  }
+
+  bool get isSubscription => type == StoreProductType.subscription;
+
+  /// 查找免费试用优惠（如果有）
+  StoreOfferInfo? get freeTrialOffer {
+    try {
+      return offers.firstWhere(
+        (o) =>
+            o.type == StoreOfferType.freeTrial ||
+            o.paymentMode == StorePaymentMode.freeTrial,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 查找特定优惠
+  StoreOfferInfo? getOfferById(String offerId) {
+    try {
+      return offers.firstWhere((o) => o.id == offerId);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  String toString() {
+    return 'StoreProductInfo(id: $id, title: $title, type: $type, price: ${priceInfo.formattedPrice}, offers: ${offers.length})';
+  }
 }
