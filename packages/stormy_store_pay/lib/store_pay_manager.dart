@@ -247,7 +247,11 @@ class StorePayManager {
     errorSub = purchaseErrorStream.listen((event) {
       if (event.productId == productId && !completer.isCompleted) {
         cleanup();
-        completer.completeError(Exception(event.message));
+        completer.completeError(StorePayException(
+          event.message,
+          status: event.purchaseStatus,
+          cause: event.cause,
+        ));
       }
     });
 

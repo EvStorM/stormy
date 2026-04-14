@@ -9,6 +9,23 @@ export 'store_pay_events.dart'
         IAPPurchaseErrorEvent,
         PurchaseDetailsTransactionExtension;
 
+/// 内购异常类
+class StorePayException implements Exception {
+  final String message;
+  final PurchaseStatus? status;
+  final Object? cause;
+
+  StorePayException(this.message, {this.status, this.cause});
+
+  bool get isCanceled => status == PurchaseStatus.canceled;
+
+  @override
+  String toString() {
+    return 'StorePayException: $message${status != null ? ' (Status: $status)' : ''}';
+  }
+}
+
+
 /// 内购状态枚举
 enum IAPStatus { uninitialized, initializing, initialized, initializeFailed }
 

@@ -303,8 +303,6 @@ class AppleStoreManager implements StorePayManagerBase {
     );
   }
 
-
-
   @override
   void setPurchaseVerifier(PurchaseVerifier? verifier) {
     _purchaseVerifier = verifier;
@@ -428,6 +426,13 @@ class AppleStoreManager implements StorePayManagerBase {
 
       if (purchaseDetails.status == PurchaseStatus.canceled) {
         debugPrint('[Apple Store] 购买已取消: ${purchaseDetails.productID}');
+        _notifyPurchaseError(
+          _buildErrorEvent(
+            '用户取消了购买',
+            details: purchaseDetails,
+            status: PurchaseStatus.canceled,
+          ),
+        );
         if (_config.autoCompletePurchases &&
             purchaseDetails.pendingCompletePurchase) {
           await _inAppPurchase.completePurchase(purchaseDetails);
@@ -540,8 +545,6 @@ class AppleStoreManager implements StorePayManagerBase {
   }
 
   // ========== 内部辅助方法 ==========
-
-
 
   bool _validateVerifier() {
     if (_purchaseVerifier == null) {

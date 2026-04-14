@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 
 import '../config/network_config.dart';
 import '../error/error_handler.dart';
@@ -46,6 +49,18 @@ class StormyNetworkClient {
     // 后置日志拦截引擎，保障拦截最外层的准确变化（需基于 talker 打印）
     if (config.enableLog) {
       _dio.interceptors.add(LoggingInterceptor.build());
+    }
+
+    // 判断是否强制跳过 HTTPS 证书校验
+    if (config.skipCertificateVerification) {
+      _dio.httpClientAdapter = IOHttpClientAdapter(
+        createHttpClient: () {
+          final client = HttpClient();
+          client.badCertificateCallback =
+              (X509Certificate cert, String host, int port) => true;
+          return client;
+        },
+      );
     }
   }
 

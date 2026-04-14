@@ -29,6 +29,9 @@ class StormyNetworkConfig {
   /// 默认是否校验并注入全局 Header（默认为 true）
   final bool defaultRequireHeader;
 
+  /// 是否跳过 HTTPS 证书校验（默认为 false）
+  final bool skipCertificateVerification;
+
   /// 统一响应解包配置（用于提取后端数据字段）
   /// 默认约定后端返回格式为 { "code": 0, "msg": "xx", "data": ... }
   final ResponseParsingConfig parsingConfig;
@@ -43,6 +46,7 @@ class StormyNetworkConfig {
     this.enableLog = true,
     this.defaultRequireToken = true,
     this.defaultRequireHeader = true,
+    this.skipCertificateVerification = false,
     ResponseParsingConfig? parsingConfig,
   }) : parsingConfig = parsingConfig ?? const ResponseParsingConfig();
 }

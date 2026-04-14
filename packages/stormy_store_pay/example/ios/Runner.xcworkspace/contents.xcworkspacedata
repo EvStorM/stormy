@@ -5,9 +5,6 @@
       location = "group:../keys/Configuration.storekit">
    </FileRef>
    <FileRef
-      location = "group:../keys/teststore.storekit">
-   </FileRef>
-   <FileRef
       location = "group:Runner.xcodeproj">
    </FileRef>
    <FileRef
