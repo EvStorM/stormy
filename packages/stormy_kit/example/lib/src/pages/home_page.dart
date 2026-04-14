@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:stormy_kit/stormy_kit.dart';
 
-
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
@@ -16,20 +15,28 @@ class HomePage extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            _buildItem(context, '网络模块', '演示 GET/POST、并发挂起与拦截', '/network', Icons.cloud),
-            _buildItem(context, '存储模块', '演示本地存取、安全加密与过期策略', '/storage', Icons.sd_storage),
-            _buildItem(context, '主题模块', '演示深浅色与自定义变体', '/theme', Icons.color_lens),
-            _buildItem(context, '对话框模块', '演示 Loading、Toast、Confirm 与弹窗', '/dialog', Icons.message),
-            _buildItem(context, '组件模块', '演示内置封装的基础 UI 组件', '/widgets', Icons.widgets),
-            _buildItem(context, '多语言模块', '演示语言切换与动态持久化', '/i18n', Icons.translate),
-            _buildItem(context, '刷新模块', '演示下拉刷新与分页加载', '/refresh', Icons.refresh),
+            _buildItem(context, '网络模块', '演示 GET/POST、并发挂起与拦截', '/network',
+                Icons.cloud),
+            _buildItem(context, '存储模块', '演示本地存取、安全加密与过期策略', '/storage',
+                Icons.sd_storage),
+            _buildItem(
+                context, '主题模块', '演示深浅色与自定义变体', '/theme', Icons.color_lens),
+            _buildItem(context, '对话框模块', '演示 Loading、Toast、Confirm 与弹窗',
+                '/dialog', Icons.message),
+            _buildItem(
+                context, '组件模块', '演示内置封装的基础 UI 组件', '/widgets', Icons.widgets),
+            _buildItem(
+                context, '多语言模块', '演示语言切换与动态持久化', '/i18n', Icons.translate),
+            _buildItem(
+                context, '刷新模块', '演示下拉刷新与分页加载', '/refresh', Icons.refresh),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildItem(BuildContext context, String title, String subtitle, String route, IconData icon) {
+  Widget _buildItem(BuildContext context, String title, String subtitle,
+      String route, IconData icon) {
     final theme = Theme.of(context);
     return Card(
       elevation: 0,

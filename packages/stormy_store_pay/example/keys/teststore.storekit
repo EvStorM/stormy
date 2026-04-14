@@ -1,0 +1,208 @@
+{
+  "appPolicies" : {
+    "eula" : "",
+    "policies" : [
+      {
+        "locale" : "en_US",
+        "policyText" : "",
+        "policyURL" : ""
+      }
+    ]
+  },
+  "identifier" : "CBAED9B1",
+  "nonRenewingSubscriptions" : [
+    {
+      "displayPrice" : "5.99",
+      "familyShareable" : false,
+      "internalID" : "F535CDA7",
+      "localizations" : [
+        {
+          "description" : "",
+          "displayName" : "",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "stormy.store.thirty",
+      "referenceName" : "premium pass",
+      "type" : "NonRenewingSubscription"
+    }
+  ],
+  "products" : [
+    {
+      "displayPrice" : "0.99",
+      "familyShareable" : false,
+      "internalID" : "5710518B",
+      "localizations" : [
+        {
+          "description" : "This package is amazing",
+          "displayName" : "Super Package",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "stormy.store.package",
+      "referenceName" : "Super Package",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "1.99",
+      "familyShareable" : false,
+      "internalID" : "COINS100",
+      "localizations" : [
+        {
+          "description" : "Get 100 gold coins for your adventures",
+          "displayName" : "100 Gold Coins",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "stormy.store.coins.hundred",
+      "referenceName" : "100 Gold Coins",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "0.99",
+      "familyShareable" : false,
+      "internalID" : "ENERGY10",
+      "localizations" : [
+        {
+          "description" : "Refill your energy to keep playing",
+          "displayName" : "10 Energy",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "stormy.store.energy.ten",
+      "referenceName" : "10 Energy",
+      "type" : "Consumable"
+    }
+  ],
+  "settings" : {
+    "_askToBuyEnabled" : false,
+    "_billingGracePeriodEnabled" : false,
+    "_billingIssuesEnabled" : false,
+    "_compatibilityTimeRate" : {
+      "3" : 6
+    },
+    "_disableDialogs" : false,
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_US",
+    "_renewalBillingIssuesEnabled" : false,
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+      {
+        "current" : {
+          "index" : 2,
+          "type" : "generic"
+        },
+        "enabled" : false,
+        "name" : "Load Products"
+      },
+      {
+        "enabled" : false,
+        "name" : "Purchase"
+      },
+      {
+        "enabled" : false,
+        "name" : "Verification"
+      },
+      {
+        "enabled" : false,
+        "name" : "App Store Sync"
+      },
+      {
+        "enabled" : false,
+        "name" : "Subscription Status"
+      },
+      {
+        "enabled" : false,
+        "name" : "App Transaction"
+      },
+      {
+        "current" : {
+          "index" : 3,
+          "type" : "generic"
+        },
+        "enabled" : false,
+        "name" : "Manage Subscriptions Sheet"
+      },
+      {
+        "enabled" : false,
+        "name" : "Refund Request Sheet"
+      },
+      {
+        "enabled" : false,
+        "name" : "Offer Code Redeem Sheet"
+      }
+    ],
+    "_timeRate" : 1002
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "DC075F47",
+      "localizations" : [
+
+      ],
+      "name" : "Super Duper Sub",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "0.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "05B821A0",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "",
+              "displayName" : "",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "stormy.store.weekly",
+          "recurringSubscriptionPeriod" : "P1W",
+          "referenceName" : "Super Duper Sub Weekly",
+          "subscriptionGroupID" : "DC075F47",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "10.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "9571A92B",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "",
+              "displayName" : "",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "stormy.store.yearly",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Super Super Sub Yearly",
+          "subscriptionGroupID" : "DC075F47",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}

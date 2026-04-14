@@ -1,0 +1,199 @@
+{
+  "identifier" : "F7A3B2E1-9C4D-4F8A-B6E5-1D2C3A4B5E6F",
+  "nonRenewingSubscriptions" : [
+    {
+      "displayPrice" : "6.99",
+      "familyShareable" : false,
+      "internalID" : "NRS00001",
+      "localizations" : [
+        {
+          "description" : "30天高级功能体验",
+          "displayName" : "30天体验卡",
+          "locale" : "zh_CN"
+        },
+        {
+          "description" : "30-day premium access",
+          "displayName" : "30-Day Pass",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "test_non_renewing_sub",
+      "referenceName" : "30天体验卡",
+      "type" : "NonRenewingSubscription"
+    }
+  ],
+  "products" : [
+    {
+      "displayPrice" : "0.99",
+      "familyShareable" : false,
+      "internalID" : "CON00001",
+      "localizations" : [
+        {
+          "description" : "购买100个金币",
+          "displayName" : "100金币",
+          "locale" : "zh_CN"
+        },
+        {
+          "description" : "Purchase 100 coins",
+          "displayName" : "100 Coins",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "test_consumable_coin",
+      "referenceName" : "100金币",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : true,
+      "internalID" : "NCO00001",
+      "localizations" : [
+        {
+          "description" : "永久移除所有广告",
+          "displayName" : "移除广告",
+          "locale" : "zh_CN"
+        },
+        {
+          "description" : "Remove all ads permanently",
+          "displayName" : "Remove Ads",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "test_non_consumable_remove_ads",
+      "referenceName" : "移除广告",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_applicationInternalID" : "1234567890",
+    "_askToBuyEnabled" : false,
+    "_billingGracePeriodEnabled" : true,
+    "_billingIssuesEnabled" : false,
+    "_failTransactionsEnabled" : false,
+    "_locale" : "zh_CN",
+    "_pricingIntervalsEnabled" : false,
+    "_renewalBehavior" : {
+      "_state" : 0
+    },
+    "_storefront" : "CHN",
+    "_storeKitErrors" : [
+      {
+        "enabled" : false,
+        "name" : "cycleCount"
+      },
+      {
+        "enabled" : false,
+        "name" : "generic"
+      },
+      {
+        "enabled" : false,
+        "name" : "network"
+      },
+      {
+        "enabled" : false,
+        "name" : "notAvailableInStorefront"
+      },
+      {
+        "enabled" : false,
+        "name" : "notEntitled"
+      },
+      {
+        "enabled" : false,
+        "name" : "purchaseNotAllowed"
+      },
+      {
+        "enabled" : false,
+        "name" : "systemError"
+      }
+    ],
+    "_timeRate" : 6
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "VIP00001",
+      "localizations" : [
+        {
+          "description" : "VIP 会员",
+          "displayName" : "VIP 会员",
+          "locale" : "zh_CN"
+        },
+        {
+          "description" : "VIP Membership",
+          "displayName" : "VIP Membership",
+          "locale" : "en_US"
+        }
+      ],
+      "name" : "VIP",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "6.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "SUB00001",
+          "localizations" : [
+            {
+              "description" : "每月自动续费，随时可取消",
+              "displayName" : "VIP 月度会员",
+              "locale" : "zh_CN"
+            },
+            {
+              "description" : "Monthly auto-renewing, cancel anytime",
+              "displayName" : "VIP Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "test_sub_vip_monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "VIP 月度会员",
+          "subscriptionGroupID" : "VIP00001",
+          "type" : "RecurringSubscription",
+          "winBackOffers" : [
+
+          ]
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "49.99",
+          "familyShareable" : true,
+          "groupNumber" : 2,
+          "internalID" : "SUB00002",
+          "localizations" : [
+            {
+              "description" : "每年自动续费，超值优惠",
+              "displayName" : "VIP 年度会员",
+              "locale" : "zh_CN"
+            },
+            {
+              "description" : "Yearly auto-renewing, best value",
+              "displayName" : "VIP Yearly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "test_sub_vip_yearly",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "VIP 年度会员",
+          "subscriptionGroupID" : "VIP00001",
+          "type" : "RecurringSubscription",
+          "winBackOffers" : [
+
+          ]
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}

@@ -19,3 +19,6 @@ export 'src/apple/apple_store_export.dart';
 
 // Facade
 export 'store_pay_manager.dart';
+
+// 包含in_app_purchase 的所有导出
+export 'package:in_app_purchase/in_app_purchase.dart';

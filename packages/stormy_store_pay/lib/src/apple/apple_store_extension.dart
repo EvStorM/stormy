@@ -106,7 +106,9 @@ class AppleStoreExtension implements IAPPlatformExtension {
   }
 
   /// 获取订阅优惠列表
-  Future<List<SK2SubscriptionOffer>> getSubscriptionOffers(String productId) async {
+  Future<List<SK2SubscriptionOffer>> getSubscriptionOffers(
+    String productId,
+  ) async {
     return _performGetSubscriptionOffers(productId);
   }
 
