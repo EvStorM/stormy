@@ -18,12 +18,6 @@ enum IAPPlatform { google, apple, unsupported }
 /// 购买生命周期状态
 enum IAPPurchaseLifecycle { purchased, restored, pending }
 
-// ========== 回调 ==========
-
-typedef OnPurchaseSuccess = void Function(IAPPurchaseEvent event);
-typedef OnPurchaseError = void Function(IAPPurchaseErrorEvent event);
-typedef OnProductsLoaded = void Function(List<StoreProductInfo> products);
-typedef OnPurchaseRestored = void Function(IAPPurchaseEvent event);
 typedef PurchaseVerifier =
     Future<bool> Function(PurchaseDetails purchaseDetails);
 

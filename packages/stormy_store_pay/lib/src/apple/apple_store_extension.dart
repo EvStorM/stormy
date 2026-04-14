@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:in_app_purchase_storekit/in_app_purchase_storekit.dart';
-import 'package:in_app_purchase_storekit/store_kit_2_wrappers.dart';
 
 import '../store_pay_base.dart';
 import '../store_pay_types.dart';

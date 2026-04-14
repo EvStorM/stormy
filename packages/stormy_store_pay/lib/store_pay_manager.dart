@@ -24,11 +24,7 @@ class StorePayManager {
   PurchaseVerifier? _purchaseVerifier;
   StorePayConfig _config = StorePayConfig.defaultConfig;
 
-  // ========== 缓存回调（初始化前也能安全调用） ==========
-  OnPurchaseSuccess? _onPurchaseSuccess;
-  OnPurchaseError? _onPurchaseError;
-  OnProductsLoaded? _onProductsLoaded;
-  OnPurchaseRestored? _onPurchaseRestored;
+  // ========== 配置 ==========
 
   /// 当前平台类型
   IAPPlatform get currentPlatform {
@@ -64,7 +60,7 @@ class StorePayManager {
       _platformManager?.isLoadingNotifier ?? ValueNotifier(false);
 
   bool get isLoading => _platformManager?.isLoading ?? false;
-  
+
   /// 当前已缓存的所有商品（已转换为统一格式）
   List<StoreProductInfo> get products => _platformManager?.products ?? [];
 
@@ -86,7 +82,6 @@ class StorePayManager {
 
   Stream<IAPPurchaseEvent> get purchaseRestoredStream =>
       _platformManager?.purchaseRestoredStream ?? const Stream.empty();
-
   // ========== 核心方法 ==========
 
   Future<bool> initialize({
@@ -136,7 +131,6 @@ class StorePayManager {
     if (success) {
       _googleExtension = GoogleStoreExtension();
       _appleExtension = null;
-      _applyPendingCallbacks();
     } else {
       _platformManager = null;
       _googleExtension = null;
@@ -156,27 +150,12 @@ class StorePayManager {
     if (success) {
       _appleExtension = AppleStoreExtension();
       _googleExtension = null;
-      _applyPendingCallbacks();
     } else {
       _platformManager = null;
       _appleExtension = null;
     }
 
     return success;
-  }
-
-  void _applyPendingCallbacks() {
-    if (_onPurchaseSuccess != null ||
-        _onPurchaseError != null ||
-        _onProductsLoaded != null ||
-        _onPurchaseRestored != null) {
-      _platformManager?.setCallbacks(
-        onPurchaseSuccess: _onPurchaseSuccess,
-        onPurchaseError: _onPurchaseError,
-        onProductsLoaded: _onProductsLoaded,
-        onPurchaseRestored: _onPurchaseRestored,
-      );
-    }
   }
 
   /// 查询产品信息，并返回统一化的高级数据结构列表
@@ -208,11 +187,9 @@ class StorePayManager {
     }
 
     if (productInfo.isPurchased) {
-      debugPrint('[StorePayManager] 拦截重复购买：${productInfo.title} (${productInfo.nativeProductId}) 已经购买。');
-      _onPurchaseError?.call(IAPPurchaseErrorEvent(
-        message: '您已购买过此商品，无法重复购买。',
-        productId: productInfo.nativeProductId,
-      ));
+      debugPrint(
+        '[StorePayManager] 拦截重复购买：${productInfo.title} (${productInfo.nativeProductId}) 已经购买。',
+      );
       return false;
     }
 
@@ -244,18 +221,43 @@ class StorePayManager {
 
   // ========== 配置注入 ==========
 
-  void setCallbacks({
-    OnPurchaseSuccess? onPurchaseSuccess,
-    OnPurchaseError? onPurchaseError,
-    OnProductsLoaded? onProductsLoaded,
-    OnPurchaseRestored? onPurchaseRestored,
+  /// 监听一次特定的内购结果 (配合 purchaseProduct 使用)
+  /// 如果成功，则返回 [IAPPurchaseEvent]；如果失败，则抛出异常
+  Future<IAPPurchaseEvent> waitForPurchase(
+    String productId, {
+    Duration timeout = const Duration(minutes: 5),
   }) {
-    _onPurchaseSuccess = onPurchaseSuccess;
-    _onPurchaseError = onPurchaseError;
-    _onProductsLoaded = onProductsLoaded;
-    _onPurchaseRestored = onPurchaseRestored;
+    final completer = Completer<IAPPurchaseEvent>();
 
-    _applyPendingCallbacks();
+    late StreamSubscription<IAPPurchaseEvent> successSub;
+    late StreamSubscription<IAPPurchaseErrorEvent> errorSub;
+
+    void cleanup() {
+      successSub.cancel();
+      errorSub.cancel();
+    }
+
+    successSub = purchaseSuccessStream.listen((event) {
+      if (event.productId == productId && !completer.isCompleted) {
+        cleanup();
+        completer.complete(event);
+      }
+    });
+
+    errorSub = purchaseErrorStream.listen((event) {
+      if (event.productId == productId && !completer.isCompleted) {
+        cleanup();
+        completer.completeError(Exception(event.message));
+      }
+    });
+
+    return completer.future.timeout(
+      timeout,
+      onTimeout: () {
+        cleanup();
+        throw TimeoutException('等待内购结果超时: $productId');
+      },
+    );
   }
 
   void setPurchaseVerifier(PurchaseVerifier verifier) {

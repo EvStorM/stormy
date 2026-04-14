@@ -55,24 +55,9 @@ await StorePayManager.instance.initialize(
   },
 );
 
-// 设置回调
-StorePayManager.instance.setCallbacks(
-  onPurchaseSuccess: (event) {
-    print('购买成功: ${event.productId}');
-    if (event.isRestored) {
-      print('这是恢复的购买');
-    }
-  },
-  onPurchaseError: (error) {
-    print('购买失败: ${error.message}');
-  },
-  onProductsLoaded: (products) {
-    print('加载了 ${products.length} 个产品');
-  },
-  onPurchaseRestored: (event) {
-    print('恢复购买: ${event.productId}');
-  },
-);
+// 以下是可选：全局事件监听方式（可配置在应用顶层）
+// StorePayManager.instance.purchaseSuccessStream.listen((event) { ... });
+// StorePayManager.instance.purchaseErrorStream.listen((event) { ... });
 ```
 
 ### 3. 查询产品
@@ -91,7 +76,16 @@ final products = await StorePayManager.instance.queryProducts([
 ```dart
 final product = StorePayManager.instance.getProduct('product_monthly');
 if (product != null) {
-  await StorePayManager.instance.purchaseProduct(product);
+  final success = await StorePayManager.instance.purchaseProduct(product);
+  if (success) {
+    try {
+      // 推荐：一次性同步等待本次购买结果
+      final event = await StorePayManager.instance.waitForPurchase(product.id, timeout: const Duration(minutes: 5));
+      print('购买流程彻底完成: ${event.productId}');
+    } catch (e) {
+      print('单次监听购买捕获到异常或超时: $e');
+    }
+  }
 }
 ```
 

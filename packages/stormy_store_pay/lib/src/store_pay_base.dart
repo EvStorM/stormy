@@ -36,12 +36,6 @@ abstract class StorePayManagerBase {
   Stream<List<StoreProductInfo>> get productsLoadedStream;
   Stream<IAPPurchaseEvent> get purchaseRestoredStream;
 
-  // ========== 可选回调 =============
-  OnPurchaseSuccess? onPurchaseSuccess;
-  OnPurchaseError? onPurchaseError;
-  OnProductsLoaded? onProductsLoaded;
-  OnPurchaseRestored? onPurchaseRestored;
-
   // ========== 核心操作 =============
   Future<bool> initialize();
 
@@ -68,13 +62,6 @@ abstract class StorePayManagerBase {
   StoreProductInfo? getProduct(String unifiedId);
 
   bool hasPurchased(String nativeProductId);
-
-  void setCallbacks({
-    OnPurchaseSuccess? onPurchaseSuccess,
-    OnPurchaseError? onPurchaseError,
-    OnProductsLoaded? onProductsLoaded,
-    OnPurchaseRestored? onPurchaseRestored,
-  });
 
   void setPurchaseVerifier(PurchaseVerifier? verifier);
   void setConfig(StorePayConfig config);

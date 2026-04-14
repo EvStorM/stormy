@@ -42,19 +42,6 @@ class AppleStoreManager implements StorePayManagerBase {
   final StreamController<IAPPurchaseEvent> _purchaseRestoredController =
       StreamController<IAPPurchaseEvent>.broadcast();
 
-  // ========== 回调函数 ==========
-  @override
-  OnPurchaseSuccess? onPurchaseSuccess;
-
-  @override
-  OnPurchaseError? onPurchaseError;
-
-  @override
-  OnProductsLoaded? onProductsLoaded;
-
-  @override
-  OnPurchaseRestored? onPurchaseRestored;
-
   PurchaseVerifier? _purchaseVerifier;
 
   // ========== 公开访问器 ==========
@@ -110,6 +97,8 @@ class AppleStoreManager implements StorePayManagerBase {
   }
 
   // ========== 核心方法 ==========
+  Completer<bool>? _initCompleter;
+
   @override
   Future<bool> initialize() async {
     if (_statusNotifier.value == IAPStatus.initialized) {
@@ -117,12 +106,12 @@ class AppleStoreManager implements StorePayManagerBase {
       return true;
     }
 
-    if (_statusNotifier.value == IAPStatus.initializing) {
+    if (_initCompleter != null) {
       debugPrint('[Apple Store] 内购管理器正在初始化中，等待完成...');
-      await _waitForInitialization();
-      return _statusNotifier.value == IAPStatus.initialized;
+      return await _initCompleter!.future;
     }
 
+    _initCompleter = Completer<bool>();
     _statusNotifier.value = IAPStatus.initializing;
 
     try {
@@ -147,9 +136,13 @@ class AppleStoreManager implements StorePayManagerBase {
 
       _statusNotifier.value = IAPStatus.initialized;
       debugPrint('[Apple Store] 内购管理器初始化成功');
+      _initCompleter?.complete(true);
+      _initCompleter = null;
       return true;
     } catch (e) {
       _setError('初始化失败: $e', IAPStatus.initializeFailed);
+      _initCompleter?.complete(false);
+      _initCompleter = null;
       return false;
     }
   }
@@ -310,18 +303,7 @@ class AppleStoreManager implements StorePayManagerBase {
     );
   }
 
-  @override
-  void setCallbacks({
-    OnPurchaseSuccess? onPurchaseSuccess,
-    OnPurchaseError? onPurchaseError,
-    OnProductsLoaded? onProductsLoaded,
-    OnPurchaseRestored? onPurchaseRestored,
-  }) {
-    this.onPurchaseSuccess = onPurchaseSuccess;
-    this.onPurchaseError = onPurchaseError;
-    this.onProductsLoaded = onProductsLoaded;
-    this.onPurchaseRestored = onPurchaseRestored;
-  }
+
 
   @override
   void setPurchaseVerifier(PurchaseVerifier? verifier) {
@@ -346,22 +328,18 @@ class AppleStoreManager implements StorePayManagerBase {
   // ========== 内部通知方法 ==========
   void _notifyPurchaseEvent(IAPPurchaseEvent event) {
     _purchaseSuccessController.add(event);
-    onPurchaseSuccess?.call(event);
 
     if (event.isRestored) {
       _purchaseRestoredController.add(event);
-      onPurchaseRestored?.call(event);
     }
   }
 
   void _notifyPurchaseError(IAPPurchaseErrorEvent errorEvent) {
     _purchaseErrorController.add(errorEvent);
-    onPurchaseError?.call(errorEvent);
   }
 
   void _notifyProductsLoaded(List<StoreProductInfo> products) {
     _productsLoadedController.add(products);
-    onProductsLoaded?.call(products);
   }
 
   IAPPurchaseEvent _createPurchaseEvent(
@@ -434,36 +412,56 @@ class AppleStoreManager implements StorePayManagerBase {
     List<PurchaseDetails> purchaseDetailsList,
   ) async {
     for (final PurchaseDetails purchaseDetails in purchaseDetailsList) {
-      switch (purchaseDetails.status) {
-        case PurchaseStatus.pending:
-          debugPrint('[Apple Store] 购买进行中: ${purchaseDetails.productID}');
-          break;
-
-        case PurchaseStatus.purchased:
-          await _handleCompletedPurchase(
-            purchaseDetails,
-            IAPPurchaseLifecycle.purchased,
-          );
-          break;
-        case PurchaseStatus.restored:
-          await _handleCompletedPurchase(
-            purchaseDetails,
-            IAPPurchaseLifecycle.restored,
-          );
-          break;
-
-        case PurchaseStatus.error:
-          _handlePurchaseError(purchaseDetails);
-          break;
-
-        case PurchaseStatus.canceled:
-          debugPrint('[Apple Store] 购买已取消: ${purchaseDetails.productID}');
-          break;
+      if (purchaseDetails.status == PurchaseStatus.pending) {
+        debugPrint('[Apple Store] 购买进行中: ${purchaseDetails.productID}');
+        continue;
       }
 
-      if (_config.autoCompletePurchases &&
-          purchaseDetails.pendingCompletePurchase) {
-        await _inAppPurchase.completePurchase(purchaseDetails);
+      if (purchaseDetails.status == PurchaseStatus.error) {
+        _handlePurchaseError(purchaseDetails);
+        if (_config.autoCompletePurchases &&
+            purchaseDetails.pendingCompletePurchase) {
+          await _inAppPurchase.completePurchase(purchaseDetails);
+        }
+        continue;
+      }
+
+      if (purchaseDetails.status == PurchaseStatus.canceled) {
+        debugPrint('[Apple Store] 购买已取消: ${purchaseDetails.productID}');
+        if (_config.autoCompletePurchases &&
+            purchaseDetails.pendingCompletePurchase) {
+          await _inAppPurchase.completePurchase(purchaseDetails);
+        }
+        continue;
+      }
+
+      if (purchaseDetails.status == PurchaseStatus.purchased ||
+          purchaseDetails.status == PurchaseStatus.restored) {
+        bool verified = false;
+        try {
+          verified = await _runPurchaseVerification(purchaseDetails);
+        } catch (e) {
+          verified = false;
+        }
+
+        if (verified) {
+          await _handleCompletedPurchase(
+            purchaseDetails,
+            purchaseDetails.status == PurchaseStatus.purchased
+                ? IAPPurchaseLifecycle.purchased
+                : IAPPurchaseLifecycle.restored,
+          );
+
+          if (_config.autoCompletePurchases &&
+              purchaseDetails.pendingCompletePurchase) {
+            await _inAppPurchase.completePurchase(purchaseDetails);
+          }
+        } else {
+          _notifyPurchaseError(
+            _buildErrorEvent('购买验证失败, 订单保留以待重试', details: purchaseDetails),
+          );
+          // 这里千万不调用 completePurchase，以便下一次打开 App 可以重新取到它继续验单！
+        }
       }
     }
   }
@@ -473,13 +471,6 @@ class AppleStoreManager implements StorePayManagerBase {
     IAPPurchaseLifecycle lifecycle,
   ) async {
     try {
-      if (!await _runPurchaseVerification(purchaseDetails)) {
-        _notifyPurchaseError(
-          _buildErrorEvent('购买验证失败', details: purchaseDetails),
-        );
-        return;
-      }
-
       _upsertPurchase(purchaseDetails);
       final cachedProduct = _productCache.values
           .where((p) => p.nativeProductId == purchaseDetails.productID)
@@ -498,7 +489,7 @@ class AppleStoreManager implements StorePayManagerBase {
       );
 
       debugPrint(
-        '[Apple Store] 购买成功: ${purchaseDetails.productID}, lifecycle: $lifecycle',
+        '[Apple Store] 购买成功与验证完成: ${purchaseDetails.productID}, lifecycle: $lifecycle',
       );
       _notifyPurchaseEvent(event);
     } catch (e) {
@@ -550,17 +541,7 @@ class AppleStoreManager implements StorePayManagerBase {
 
   // ========== 内部辅助方法 ==========
 
-  Future<void> _waitForInitialization() async {
-    final deadline = DateTime.now().add(const Duration(seconds: 30));
-    await Future.doWhile(() async {
-      await Future.delayed(const Duration(milliseconds: 100));
-      if (DateTime.now().isAfter(deadline)) {
-        _setError('初始化超时', IAPStatus.initializeFailed);
-        return false;
-      }
-      return _statusNotifier.value == IAPStatus.initializing;
-    });
-  }
+
 
   bool _validateVerifier() {
     if (_purchaseVerifier == null) {

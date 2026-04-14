@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -21,10 +22,20 @@ class _StorePayExamplePageState extends State<StorePayExamplePage> {
   bool _isInitializing = true;
   List<StoreProductInfo> _products = [];
 
+  final List<StreamSubscription> _subscriptions = [];
+
   @override
   void initState() {
     super.initState();
     _initStorePay();
+  }
+
+  @override
+  void dispose() {
+    for (final sub in _subscriptions) {
+      sub.cancel();
+    }
+    super.dispose();
   }
 
   void _log(String message) {
@@ -62,23 +73,26 @@ class _StorePayExamplePageState extends State<StorePayExamplePage> {
         },
       );
 
-      StorePayManager.instance.setCallbacks(
-        onPurchaseSuccess: (event) {
-          _log('购买成功: ${event.productId}, 恢复: ${event.isRestored}');
-        },
-        onPurchaseError: (error) {
-          _log('购买失败: ${error.message}');
-        },
-        onProductsLoaded: (products) {
-          _log('加载产品: ${products.length} 个');
+      _subscriptions.add(StorePayManager.instance.purchaseSuccessStream.listen((event) {
+        _log('全局监听-购买/恢复成功: ${event.productId}');
+      }));
+      
+      _subscriptions.add(StorePayManager.instance.purchaseErrorStream.listen((error) {
+        _log('全局监听-购买失败: ${error.message}');
+      }));
+      
+      _subscriptions.add(StorePayManager.instance.productsLoadedStream.listen((products) {
+        _log('加载产品: ${products.length} 个');
+        if (mounted) {
           setState(() {
             _products = products;
           });
-        },
-        onPurchaseRestored: (event) {
-          _log('恢复购买: ${event.productId}');
-        },
-      );
+        }
+      }));
+      
+      _subscriptions.add(StorePayManager.instance.purchaseRestoredStream.listen((event) {
+        _log('全局监听-恢复购买完成: ${event.productId}');
+      }));
 
       setState(() => _isInitializing = false);
       _log('初始化完成');
@@ -102,11 +116,17 @@ class _StorePayExamplePageState extends State<StorePayExamplePage> {
   }
 
   Future<void> _purchaseProduct(StoreProductInfo product) async {
-    _log('尝试购买: ${product.id}');
+    _log('尝试请求购买: ${product.id}');
     try {
-      await StorePayManager.instance.purchaseProduct(product);
+      final success = await StorePayManager.instance.purchaseProduct(product);
+      if (success) {
+        _log('购买请求已发送，等待最终结果...');
+        // 展示一次性监听的使用体验
+        final event = await StorePayManager.instance.waitForPurchase(product.id, timeout: const Duration(minutes: 5));
+        _log('一次性监听-完成交易: ${event.productId}');
+      }
     } catch (e) {
-      _log('购买异常: $e');
+      _log('购买出现异常: $e');
     }
   }
 
