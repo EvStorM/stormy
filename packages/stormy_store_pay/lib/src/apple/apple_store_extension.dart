@@ -59,7 +59,12 @@ class AppleStoreExtension implements IAPPlatformExtension {
     }
   }
 
-  /// 带数量的购买（iOS特定）
+  /// 多次购买消耗型产品（iOS特定）
+  ///
+  /// 注意：iOS IAP 不支持原生的「指定数量购买」，此方法通过循环发起多次购买实现。
+  /// 仅适用于消耗型产品。每次购买都是独立的交易，会分别触发购买回调。
+  ///
+  /// [quantity] 购买次数，必须 >= 1
   Future<bool> purchaseWithQuantity(
     ProductDetails productDetails, {
     int quantity = 1,
@@ -86,12 +91,13 @@ class AppleStoreExtension implements IAPPlatformExtension {
       );
 
       debugPrint(
-        '[Apple Store Extension] 购买产品: ${productDetails.id}, 数量: $quantity',
+        '[Apple Store Extension] 多次购买产品: ${productDetails.id}, 次数: $quantity',
       );
 
       for (int i = 0; i < quantity; i++) {
-        final result = await _inAppPurchase.buyNonConsumable(
+        final result = await _inAppPurchase.buyConsumable(
           purchaseParam: purchaseParam,
+          autoConsume: true,
         );
         if (!result) {
           debugPrint('[Apple Store Extension] 第 ${i + 1} 次购买失败');

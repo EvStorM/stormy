@@ -17,10 +17,17 @@ class StorePayConfig {
   /// 用于在购买时关联用户身份，便于恢复购买时识别用户
   final String? applicationUserName;
 
+  /// 消耗型产品ID集合
+  ///
+  /// 用于精确区分消耗型产品，避免依赖不可靠的字符串推断。
+  /// 在 Google Play 平台上尤其重要，因为 Google Play 无法从产品信息自动推断类型。
+  final Set<String> consumableProductIds;
+
   const StorePayConfig({
     this.autoCompletePurchases = true,
     this.isForTest = false,
     this.applicationUserName,
+    this.consumableProductIds = const {},
   });
 
   /// 默认配置

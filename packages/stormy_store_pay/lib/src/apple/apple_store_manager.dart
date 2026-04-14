@@ -7,12 +7,16 @@ import 'package:in_app_purchase_storekit/store_kit_2_wrappers.dart';
 import 'package:in_app_purchase_storekit/store_kit_wrappers.dart';
 
 import '../store_pay_base.dart';
+import '../store_pay_config.dart';
 import '../store_pay_types.dart';
 
 /// Apple App Store 内购管理器实现
 class AppleStoreManager implements StorePayManagerBase {
   final InAppPurchase _inAppPurchase = InAppPurchase.instance;
   StreamSubscription<List<PurchaseDetails>>? _subscription;
+
+  // ========== 配置 ==========
+  StorePayConfig _config = StorePayConfig.defaultConfig;
 
   // ========== 状态管理 ==========
   final ValueNotifier<IAPStatus> _statusNotifier = ValueNotifier(
@@ -94,6 +98,17 @@ class AppleStoreManager implements StorePayManagerBase {
   @override
   Stream<IAPPurchaseEvent> get purchaseRestoredStream =>
       _purchaseRestoredController.stream;
+
+  // ========== 配置注入 ==========
+
+  /// 注入配置（由 StorePayManager 在初始化时调用）
+  void setConfig(StorePayConfig config) {
+    _config = config;
+    // 将 consumableProductIds 注册为消耗型
+    for (final id in config.consumableProductIds) {
+      _productTypeHints[id] = AppleProductType.consumable;
+    }
+  }
 
   // ========== 核心方法 ==========
   @override
@@ -473,7 +488,9 @@ class AppleStoreManager implements StorePayManagerBase {
           break;
       }
 
-      if (purchaseDetails.pendingCompletePurchase) {
+      // 仅在 autoCompletePurchases 为 true 时自动完成购买
+      if (_config.autoCompletePurchases &&
+          purchaseDetails.pendingCompletePurchase) {
         await _inAppPurchase.completePurchase(purchaseDetails);
       }
     }
@@ -563,9 +580,16 @@ class AppleStoreManager implements StorePayManagerBase {
   }
 
   // ========== 内部辅助方法 ==========
+
+  /// 等待初始化完成（默认 30 秒超时）
   Future<void> _waitForInitialization() async {
+    final deadline = DateTime.now().add(const Duration(seconds: 30));
     await Future.doWhile(() async {
       await Future.delayed(const Duration(milliseconds: 100));
+      if (DateTime.now().isAfter(deadline)) {
+        _setError('初始化超时', IAPStatus.initializeFailed);
+        return false;
+      }
       return _statusNotifier.value == IAPStatus.initializing;
     });
   }

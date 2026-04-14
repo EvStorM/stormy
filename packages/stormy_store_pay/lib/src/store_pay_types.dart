@@ -1,7 +1,5 @@
 import 'dart:async';
 
-import 'package:in_app_purchase/in_app_purchase.dart';
-
 import '../stormy_store_pay.dart';
 
 // Re-export event classes and types

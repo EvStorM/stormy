@@ -2,10 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
-import 'package:in_app_purchase/in_app_purchase.dart';
 import 'stormy_store_pay.dart';
-
-export 'src/store_pay_config.dart';
 
 /// 内购管理器 - 统一入口
 ///
@@ -19,18 +16,21 @@ export 'src/store_pay_config.dart';
 ///
 /// 基础使用（推荐）：
 /// ```dart
-/// // 链式初始化（推荐）
+/// // 设置回调（可在 initialize 之前调用）
+/// StorePayManager.instance.setCallbacks(
+///   onPurchaseSuccess: (event) => print('购买成功: ${event.productId}'),
+///   onPurchaseError: (error) => debugPrint('购买失败: ${error.message}'),
+/// );
+///
+/// // 初始化
 /// await StorePayManager.instance.initialize(
+///   config: StorePayConfig(
+///     consumableProductIds: {'coin_100', 'gem_50'},
+///   ),
 ///   verifier: (details) async {
 ///     // 验证购买逻辑
 ///     return true;
 ///   },
-/// );
-///
-/// // 设置回调
-/// StorePayManager.instance.setCallbacks(
-///   onPurchaseSuccess: (event) => print('购买成功: ${event.productId}'),
-///   onPurchaseError: (error) => debugPrint('购买失败: ${error.message}'),
 /// );
 ///
 /// // 查询产品并购买
@@ -70,6 +70,12 @@ class StorePayManager {
   AppleStoreExtension? _appleExtension;
   PurchaseVerifier? _purchaseVerifier;
   StorePayConfig _config = StorePayConfig.defaultConfig;
+
+  // ========== 缓存回调（初始化前也能安全调用） ==========
+  OnPurchaseSuccess? _onPurchaseSuccess;
+  OnPurchaseError? _onPurchaseError;
+  OnProductsLoaded? _onProductsLoaded;
+  OnPurchaseRestored? _onPurchaseRestored;
 
   /// 当前平台类型
   IAPPlatform get currentPlatform {
@@ -146,6 +152,7 @@ class StorePayManager {
   /// - 支持链式初始化：`await StorePayManager.instance.initialize(verifier: verifier)`
   /// - 重复调用会被忽略，只会初始化一次
   /// - 如果初始化失败，可以重新调用尝试初始化
+  /// - `setCallbacks()` 可在 `initialize()` 之前调用，回调会在初始化后自动注入
   Future<bool> initialize({
     StorePayConfig? config,
     PurchaseVerifier? verifier,
@@ -186,12 +193,14 @@ class StorePayManager {
     debugPrint('[StorePayManager] 初始化 Google Play 平台');
     final googleManager = GoogleStoreManager();
     googleManager.setPurchaseVerifier(_purchaseVerifier);
+    googleManager.setConfig(_config);
     _platformManager = googleManager;
     final success = await googleManager.initialize();
 
     if (success) {
       _googleExtension = GoogleStoreExtension();
       _appleExtension = null;
+      _applyPendingCallbacks();
     } else {
       _platformManager = null;
       _googleExtension = null;
@@ -204,18 +213,35 @@ class StorePayManager {
     debugPrint('[StorePayManager] 初始化 Apple Store 平台');
     final appleManager = AppleStoreManager();
     appleManager.setPurchaseVerifier(_purchaseVerifier);
+    appleManager.setConfig(_config);
     _platformManager = appleManager;
     final success = await appleManager.initialize();
 
     if (success) {
       _appleExtension = AppleStoreExtension();
       _googleExtension = null;
+      _applyPendingCallbacks();
     } else {
       _platformManager = null;
       _appleExtension = null;
     }
 
     return success;
+  }
+
+  /// 将缓存的回调注入到平台实现
+  void _applyPendingCallbacks() {
+    if (_onPurchaseSuccess != null ||
+        _onPurchaseError != null ||
+        _onProductsLoaded != null ||
+        _onPurchaseRestored != null) {
+      _platformManager?.setCallbacks(
+        onPurchaseSuccess: _onPurchaseSuccess,
+        onPurchaseError: _onPurchaseError,
+        onProductsLoaded: _onProductsLoaded,
+        onPurchaseRestored: _onPurchaseRestored,
+      );
+    }
   }
 
   /// 查询产品信息
@@ -303,12 +329,20 @@ class StorePayManager {
     return _platformManager?.hasPurchased(productId) ?? false;
   }
 
+  /// 设置事件回调
+  ///
+  /// 可在 `initialize()` 之前调用，回调会在初始化完成后自动注入。
   void setCallbacks({
     OnPurchaseSuccess? onPurchaseSuccess,
     OnPurchaseError? onPurchaseError,
     OnProductsLoaded? onProductsLoaded,
     OnPurchaseRestored? onPurchaseRestored,
   }) {
+    _onPurchaseSuccess = onPurchaseSuccess;
+    _onPurchaseError = onPurchaseError;
+    _onProductsLoaded = onProductsLoaded;
+    _onPurchaseRestored = onPurchaseRestored;
+
     _platformManager?.setCallbacks(
       onPurchaseSuccess: onPurchaseSuccess,
       onPurchaseError: onPurchaseError,
@@ -322,6 +356,10 @@ class StorePayManager {
     _platformManager?.setPurchaseVerifier(verifier);
   }
 
+  /// 释放资源
+  ///
+  /// 释放后可再次调用 `initialize()` 重新初始化。
+  /// 不会清除已设置的 verifier、config 和 callbacks。
   void dispose() {
     _platformManager?.dispose();
     _platformManager = null;

@@ -5,6 +5,7 @@ import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:in_app_purchase_android/in_app_purchase_android.dart';
 
 import '../store_pay_base.dart';
+import '../store_pay_config.dart';
 import '../store_pay_types.dart';
 
 /// Google Play 内购管理器实现
@@ -12,13 +13,17 @@ class GoogleStoreManager implements StorePayManagerBase {
   final InAppPurchase _inAppPurchase = InAppPurchase.instance;
   StreamSubscription<List<PurchaseDetails>>? _subscription;
 
+  // ========== 配置 ==========
+  StorePayConfig _config = StorePayConfig.defaultConfig;
+
   // ========== 状态管理 ==========
   final ValueNotifier<IAPStatus> _statusNotifier = ValueNotifier(
     IAPStatus.uninitialized,
   );
   bool _isAvailable = false;
   final ValueNotifier<bool> _isLoadingNotifier = ValueNotifier(false);
-  List<ProductDetails> _products = [];
+  final Map<String, ProductDetails> _productCache = {};
+  final Set<String> _consumableIds = {};
   final List<PurchaseDetails> _purchases = [];
   String? _errorMessage;
 
@@ -67,7 +72,8 @@ class GoogleStoreManager implements StorePayManagerBase {
   bool get isLoading => _isLoadingNotifier.value;
 
   @override
-  List<ProductDetails> get products => List.unmodifiable(_products);
+  List<ProductDetails> get products =>
+      List<ProductDetails>.unmodifiable(_productCache.values);
 
   @override
   List<PurchaseDetails> get purchasedProducts => List.unmodifiable(_purchases);
@@ -91,6 +97,22 @@ class GoogleStoreManager implements StorePayManagerBase {
   Stream<IAPPurchaseEvent> get purchaseRestoredStream =>
       _purchaseRestoredController.stream;
 
+  // ========== 配置注入 ==========
+
+  /// 注入配置（由 StorePayManager 在初始化时调用）
+  void setConfig(StorePayConfig config) {
+    _config = config;
+    _consumableIds.addAll(config.consumableProductIds);
+  }
+
+  /// 注册消耗型产品ID
+  ///
+  /// Google Play 无法从产品信息自动推断商品类型，
+  /// 必须通过此方法或 [StorePayConfig.consumableProductIds] 显式注册。
+  void registerConsumableIds(Set<String> consumableIds) {
+    _consumableIds.addAll(consumableIds);
+  }
+
   // ========== 核心方法 ==========
   @override
   Future<bool> initialize() async {
@@ -108,6 +130,14 @@ class GoogleStoreManager implements StorePayManagerBase {
     _statusNotifier.value = IAPStatus.initializing;
 
     try {
+      if (_purchaseVerifier == null) {
+        _setError(
+          'Google Play 内购初始化前必须先注入购买验证器',
+          IAPStatus.initializeFailed,
+        );
+        return false;
+      }
+
       _isAvailable = await _inAppPurchase.isAvailable();
 
       if (!_isAvailable) {
@@ -153,10 +183,16 @@ class GoogleStoreManager implements StorePayManagerBase {
         return [];
       }
 
-      _products = response.productDetails;
-      _notifyProductsLoaded(_products);
-      debugPrint('[Google Play] 查询到 ${_products.length} 个产品');
-      return _products;
+      for (final product in response.productDetails) {
+        _productCache[product.id] = product;
+      }
+
+      final products = List<ProductDetails>.unmodifiable(
+        _productCache.values,
+      );
+      _notifyProductsLoaded(products);
+      debugPrint('[Google Play] 查询到 ${response.productDetails.length} 个产品');
+      return products;
     } catch (e) {
       _notifyPurchaseError(_buildErrorEvent('查询产品失败: $e'));
       return [];
@@ -209,23 +245,21 @@ class GoogleStoreManager implements StorePayManagerBase {
   Future<bool> restorePurchases() async {
     if (!_checkInitialized()) return false;
 
-    try {
-      await _inAppPurchase.restorePurchases();
-      debugPrint('[Google Play] 恢复购买请求已发送');
-      return true;
-    } catch (e) {
-      _notifyPurchaseError(_buildErrorEvent('恢复购买失败: $e', cause: e));
-      return false;
-    }
+    return await _runWithLoading(() async {
+      try {
+        await _inAppPurchase.restorePurchases();
+        debugPrint('[Google Play] 恢复购买请求已发送');
+        return true;
+      } catch (e) {
+        _notifyPurchaseError(_buildErrorEvent('恢复购买失败: $e', cause: e));
+        return false;
+      }
+    });
   }
 
   @override
   ProductDetails? getProduct(String productId) {
-    try {
-      return _products.firstWhere((product) => product.id == productId);
-    } catch (e) {
-      return null;
-    }
+    return _productCache[productId];
   }
 
   @override
@@ -265,6 +299,9 @@ class GoogleStoreManager implements StorePayManagerBase {
     _purchaseErrorController.close();
     _productsLoadedController.close();
     _purchaseRestoredController.close();
+    _productCache.clear();
+    _consumableIds.clear();
+    _purchases.clear();
 
     debugPrint('[Google Play] 内购管理器已清理资源');
   }
@@ -341,12 +378,10 @@ class GoogleStoreManager implements StorePayManagerBase {
   }
 
   // ========== 内部处理方法 ==========
+
+  /// 通过注册的消耗型 ID 判断，默认为非消耗型
   bool _isConsumableProduct(String productId) {
-    final lowerId = productId.toLowerCase();
-    return lowerId.contains('consumable') ||
-        lowerId.contains('token') ||
-        lowerId.contains('coin') ||
-        lowerId.contains('credit');
+    return _consumableIds.contains(productId);
   }
 
   Future<void> _handlePurchaseUpdates(
@@ -380,7 +415,9 @@ class GoogleStoreManager implements StorePayManagerBase {
           break;
       }
 
-      if (purchaseDetails.pendingCompletePurchase) {
+      // 仅在 autoCompletePurchases 为 true 时自动完成购买
+      if (_config.autoCompletePurchases &&
+          purchaseDetails.pendingCompletePurchase) {
         await _inAppPurchase.completePurchase(purchaseDetails);
       }
     }
@@ -451,18 +488,35 @@ class GoogleStoreManager implements StorePayManagerBase {
   }
 
   Future<bool> _runPurchaseVerification(PurchaseDetails purchaseDetails) async {
-    if (_purchaseVerifier != null) {
-      return await _purchaseVerifier!(purchaseDetails);
+    if (_purchaseVerifier == null) {
+      throw StateError('购买验证器未设置，无法继续验证');
     }
 
-    debugPrint('[Google Play] 未设置购买验证回调，默认验证通过: ${purchaseDetails.productID}');
-    return true;
+    try {
+      final verified = await _purchaseVerifier!(purchaseDetails);
+      if (!verified) {
+        debugPrint('[Google Play] 验证未通过: ${purchaseDetails.productID}');
+      }
+      return verified;
+    } catch (e) {
+      _notifyPurchaseError(
+        _buildErrorEvent('购买验证异常: $e', details: purchaseDetails, cause: e),
+      );
+      return false;
+    }
   }
 
   // ========== 内部辅助方法 ==========
+
+  /// 等待初始化完成（默认 30 秒超时）
   Future<void> _waitForInitialization() async {
+    final deadline = DateTime.now().add(const Duration(seconds: 30));
     await Future.doWhile(() async {
       await Future.delayed(const Duration(milliseconds: 100));
+      if (DateTime.now().isAfter(deadline)) {
+        _setError('初始化超时', IAPStatus.initializeFailed);
+        return false;
+      }
       return _statusNotifier.value == IAPStatus.initializing;
     });
   }

@@ -45,6 +45,10 @@ class _StorePayExamplePageState extends State<StorePayExamplePage> {
         config: const StorePayConfig(
           autoCompletePurchases: true,
           isForTest: true,
+          consumableProductIds: {
+            'stormy.store.coins.hundred',
+            'stormy.store.energy.ten',
+          },
         ),
         verifier: (details) async {
           _log('验证购买凭证: ${details.productID}');
