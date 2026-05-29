@@ -31,6 +31,7 @@ void main() async {
   // 多 Bucket 模式配置
   final storageConfig = StormyStorageConfig(buckets: [
     const StorageBucket(name: 'default', category: 'general'),
+    const StorageBucket(name: 'demo_list', category: 'general'),
     StorageBucket(
         name: 'secure_data', encryptionCipher: cipher, category: 'setting'),
   ], defaultBucketName: 'default', registerAdapters: () {});

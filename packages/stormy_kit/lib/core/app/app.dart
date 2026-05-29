@@ -31,8 +31,11 @@ class StormyApp extends HookWidget {
             builder: (context, currentLocale, child) {
               return MaterialApp.router(
                 locale: currentLocale,
-                localizationsDelegates: StormyConfigAccessor.i18n?.localizationsDelegates,
-                supportedLocales: StormyConfigAccessor.i18n?.supportedLocales ?? const <Locale>[Locale('en', 'US')],
+                localizationsDelegates:
+                    StormyConfigAccessor.i18n?.localizationsDelegates,
+                supportedLocales:
+                    StormyConfigAccessor.i18n?.supportedLocales ??
+                    const <Locale>[Locale('en', 'US')],
                 // Router 配置
                 routerConfig: router,
                 // Theme 配置

@@ -47,7 +47,7 @@ import 'package:stormy/stormy.dart';
 void main() async {
   // 初始化存储服务
   await StormyStorageService.instance.initialize();
-  
+
   // 初始化配置
   StormyAppConfig.instance.initialize(
     config: {
@@ -55,7 +55,7 @@ void main() async {
       'isDebugMode': true,
     },
   );
-  
+
   runApp(MyApp());
 }
 ```

@@ -5,12 +5,14 @@ import 'models/storage_bucket.dart';
 
 import 'mixins/storage_operations.dart';
 import 'storage_bucket_accessor.dart';
+import 'storage_list.dart';
 
 export 'interfaces/storage_engine.dart';
 export 'models/storage_bucket.dart';
 export 'models/storage_entry.dart';
 export 'mixins/storage_operations.dart';
 export 'storage_bucket_accessor.dart';
+export 'storage_list.dart';
 
 /// StormyStorage - 统一存储总控入口
 /// 采用面相对象模型与 Accessor 返回隔离实例执行工作。
@@ -46,7 +48,8 @@ class StormyStorage with StorageOperations {
     }
   }
 
-  List<String> get bucketNames => _isInitialized && _engine != null ? _engine!.bucketNames : [];
+  List<String> get bucketNames =>
+      _isInitialized && _engine != null ? _engine!.bucketNames : [];
 
   /// 获取指定分区的配置
   StorageBucket? getBucketConfig(String bucketName) {
@@ -87,8 +90,20 @@ class StormyStorage with StorageOperations {
     return StorageBucketAccessor(_engine!, _config, bucketName);
   }
 
+  // ==================== List Manager ====================
+
+  /// 创建并获取一个专门针对某列表的数据管家 (方案C模式：每个列表独立占用一个 Bucket/Box)。
+  /// [listName] 列表名称，该名称必须在 StorageConfig 预先作为 bucket 注册。
+  StormyListStorage<T> list<T>(String listName) {
+    ensureStorageInitialized();
+    if (!_engine!.bucketNames.contains(listName)) {
+      throw Exception('未找到名为 $listName 的列表 Bucket，请确认初始化配置中定义了该实例。');
+    }
+    return StormyListStorage<T>(listName);
+  }
+
   // ==================== 额外宏操作 ====================
-  
+
   /// 清理所有已知分区的过期键值
   Future<int> clearAllExpiredAcrossBuckets() async {
     ensureStorageInitialized();
