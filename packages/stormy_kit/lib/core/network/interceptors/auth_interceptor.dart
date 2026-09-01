@@ -86,10 +86,11 @@ class AuthInterceptor extends Interceptor {
       return;
     }
     if (cancelToken.isCancelled) throw cancelToken.cancelError!;
-    await Future.any<void>([
-      configured.future,
-      cancelToken.whenCancel.then<void>((error) => throw error),
+    final outcome = await Future.any<Object?>([
+      configured.future.then<Object?>((_) => null),
+      cancelToken.whenCancel.then<Object?>((error) => error),
     ]);
+    if (outcome is DioException) throw outcome;
   }
 
   @override

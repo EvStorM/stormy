@@ -91,9 +91,14 @@ void main() {
     });
 
     final client = createClient();
+    final token = CancelToken();
 
     await expectLater(
-      client.requestStream('/failure'),
+      client.requestStream(
+        '/failure',
+        cancelToken: token,
+        cancelTag: 'failed-stream',
+      ),
       throwsA(
         isA<ServerException>().having(
           (error) => error.statusCode,
@@ -102,6 +107,8 @@ void main() {
         ),
       ),
     );
+    client.cancelByTag('failed-stream');
+    expect(token.isCancelled, isFalse);
   });
 
   test('supports cancelling a pending stream request by tag', () async {
@@ -132,13 +139,20 @@ void main() {
     () async {
       final client = createClient();
       client.dio.httpClientAdapter = _StreamErrorAdapter();
+      final token = CancelToken();
 
-      final response = await client.requestStream('/stream-error');
+      final response = await client.requestStream(
+        '/stream-error',
+        cancelToken: token,
+        cancelTag: 'stream-error',
+      );
 
       await expectLater(
         response.data!.stream.toList(),
         throwsA(isA<ConnectionException>()),
       );
+      client.cancelByTag('stream-error');
+      expect(token.isCancelled, isFalse);
     },
   );
 
@@ -157,7 +171,7 @@ void main() {
     await expectLater(body, throwsA(isA<UnknownException>()));
   });
 
-  test('cancels while waiting for global auth configuration', () async {
+  test('cancels while waiting for global header configuration', () async {
     final client = StormyNetworkClient(
       config: StormyNetworkConfig(
         baseUrl: 'http://${server.address.host}:${server.port}',
@@ -173,7 +187,33 @@ void main() {
 
     client.cancelByTag('waiting-for-auth');
 
-    await expectLater(request, throwsA(isA<UnknownException>()));
+    await expectLater(
+      request.timeout(const Duration(seconds: 1)),
+      throwsA(isA<UnknownException>()),
+    );
+  });
+
+  test('cancels while waiting for global token configuration', () async {
+    final client = StormyNetworkClient(
+      config: StormyNetworkConfig(
+        baseUrl: 'http://${server.address.host}:${server.port}',
+        enableLog: false,
+      ),
+    );
+    client.completeGlobalHeader({});
+
+    final request = client.requestStream(
+      '/waiting-for-token',
+      cancelTag: 'waiting-for-token',
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    client.cancelByTag('waiting-for-token');
+
+    await expectLater(
+      request.timeout(const Duration(seconds: 1)),
+      throwsA(isA<UnknownException>()),
+    );
   });
 
   test('registers an external token under its cancel tag', () async {
@@ -210,6 +250,27 @@ void main() {
     await response.data!.stream.drain<void>();
     client.cancelByTag('short-stream');
 
+    expect(token.isCancelled, isFalse);
+  });
+
+  test('releases a cancel tag when a finite request completes', () async {
+    server.listen((request) async {
+      request.response
+        ..headers.contentType = ContentType.json
+        ..write('{"code":0,"msg":"ok","data":"done"}');
+      await request.response.close();
+    });
+    final client = createClient();
+    final token = CancelToken();
+
+    final result = await client.get<String>(
+      '/finite-request',
+      cancelToken: token,
+      cancelTag: 'finite-request',
+    );
+    client.cancelByTag('finite-request');
+
+    expect(result, 'done');
     expect(token.isCancelled, isFalse);
   });
 }
