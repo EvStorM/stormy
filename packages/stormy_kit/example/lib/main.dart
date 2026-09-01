@@ -71,6 +71,8 @@ class MyApp extends StatelessWidget {
     return StormyApp(
       appModel: AppModel.defaults().copyWith(
         designSize: const Size(375, 812),
+        // 空列表不锁定 Flutter 方向，由 iOS/Android 平台配置决定。
+        preferredOrientations: const [],
       ),
       router: GoRouter(
         initialLocation: '/',

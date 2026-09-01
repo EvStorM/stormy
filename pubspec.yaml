@@ -6,9 +6,14 @@ workspace:
   - packages/stormy_store_pay
   - packages/stormy_i18n
 environment:
-  sdk: ">=3.10.3 <4.0.0"
+  sdk: ">=3.13.0 <4.0.0"
 dev_dependencies:
   melos: ^7.5.0
+dependency_overrides:
+  # Flutter 3.47.1 pins test_api 0.7.12 while Riverpod's transitive test
+  # constraint and stormy_i18n's analyzer 14 AST currently do not converge.
+  # Remove this workspace override when that dependency graph converges.
+  analyzer: 14.0.0
 melos:
   name: stormy_kit_workspace
   packages:

@@ -1,6 +1,6 @@
 name: stormy_i18n
 description: "A robust Flutter package for managing and automatically generating i18n localization files, streamlining the translation process."
-version: 0.0.1
+version: 0.1.0
 resolution: workspace
 
 homepage: https://github.com/EvStorM/stormy/tree/main/packages/stormy_i18n
@@ -9,7 +9,7 @@ issue_tracker: https://github.com/EvStorM/stormy/issues
 
 
 environment:
-  sdk: ^3.10.3
+  sdk: ^3.13.0
   flutter: ">=1.17.0"
 
 dependencies:
@@ -17,7 +17,7 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
-  analyzer: ^8.4.1
+  analyzer: ^14.0.0
   args: ^2.7.0
   yaml: ^3.1.3
   path: ^1.9.1

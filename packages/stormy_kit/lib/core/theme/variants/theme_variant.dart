@@ -1,4 +1,5 @@
 import 'package:chinese_font_library/chinese_font_library.dart';
+import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -31,7 +32,7 @@ abstract class ThemeVariant
       scaffoldBackgroundColor: scaffoldBackground,
       fontFamily: 'PingFang SC',
       textTheme: variantTextTheme.useSystemChineseFont(brightness),
-      pageTransitionsTheme: const PageTransitionsTheme(
+      pageTransitionsTheme: PageTransitionsTheme(
         builders: {
           TargetPlatform.android: CupertinoPageTransitionsBuilder(),
           TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),

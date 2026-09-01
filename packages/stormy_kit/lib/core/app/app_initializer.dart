@@ -56,15 +56,17 @@ class AppInitializer {
 
   /// 执行所有基础初始化
   /// 按照依赖顺序执行各项初始化任务
-  static Future<void> initialize() async {
+  static Future<void> initialize({
+    List<DeviceOrientation> orientations = const [DeviceOrientation.portraitUp],
+  }) async {
     // 初始化 Flutter 绑定
     ensureFlutterBinding();
 
     // 配置 debugPrint 输出（必须在绑定初始化之后）
     // configureDebugPrint();
 
-    // 设置屏幕方向（仅支持竖屏）
-    setScreenOrientation();
+    // 空列表会清除 Flutter 的方向限制，由系统和平台工程接管。
+    await setScreenOrientation(orientations: orientations);
 
     // 设置高刷新率
     // setHighRefreshRate();

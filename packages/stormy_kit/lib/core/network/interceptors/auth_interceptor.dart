@@ -55,18 +55,41 @@ class AuthInterceptor extends Interceptor {
     _headers.clear();
   }
 
-  Future<void> _waitForToken() async {
+  Future<void> _waitForToken(CancelToken? cancelToken) async {
     if (isTokenConfigured) return;
     final completer = Completer<void>();
     _tokenWaiters.add(completer);
-    return completer.future;
+    try {
+      await _waitForConfiguration(completer, cancelToken);
+    } finally {
+      _tokenWaiters.remove(completer);
+    }
   }
 
-  Future<void> _waitForHeader() async {
+  Future<void> _waitForHeader(CancelToken? cancelToken) async {
     if (isHeaderConfigured) return;
     final completer = Completer<void>();
     _headerWaiters.add(completer);
-    return completer.future;
+    try {
+      await _waitForConfiguration(completer, cancelToken);
+    } finally {
+      _headerWaiters.remove(completer);
+    }
+  }
+
+  Future<void> _waitForConfiguration(
+    Completer<void> configured,
+    CancelToken? cancelToken,
+  ) async {
+    if (cancelToken == null) {
+      await configured.future;
+      return;
+    }
+    if (cancelToken.isCancelled) throw cancelToken.cancelError!;
+    await Future.any<void>([
+      configured.future,
+      cancelToken.whenCancel.then<void>((error) => throw error),
+    ]);
   }
 
   @override
@@ -74,31 +97,35 @@ class AuthInterceptor extends Interceptor {
     RequestOptions options,
     RequestInterceptorHandler handler,
   ) async {
-    // 检查此接口是否需要 Header 设置
-    final requireHeader = options.extra['requireHeader'] == true;
-    if (requireHeader) {
-      await _waitForHeader();
-      // 在全局 Header 中添加，但不覆盖单次请求已显式指定的同名 Header
-      _headers.forEach((key, value) {
-        if (!options.headers.containsKey(key)) {
-          options.headers[key] = value;
-        }
-      });
-    }
+    try {
+      // 检查此接口是否需要 Header 设置
+      final requireHeader = options.extra['requireHeader'] == true;
+      if (requireHeader) {
+        await _waitForHeader(options.cancelToken);
+        // 在全局 Header 中添加，但不覆盖单次请求已显式指定的同名 Header
+        _headers.forEach((key, value) {
+          if (!options.headers.containsKey(key)) {
+            options.headers[key] = value;
+          }
+        });
+      }
 
-    // 检查此接口是否需要 Token 设置
-    final requireToken = options.extra['requireToken'] == true;
-    if (requireToken) {
-      await _waitForToken();
-      if (_token != null && _token!.isNotEmpty) {
-        // 如果接口自己没有带 token header，再使用全局 token
-        if (!options.headers.containsKey(_tokenHeaderKey)) {
-          options.headers[_tokenHeaderKey] = '$_tokenPrefix$_token';
+      // 检查此接口是否需要 Token 设置
+      final requireToken = options.extra['requireToken'] == true;
+      if (requireToken) {
+        await _waitForToken(options.cancelToken);
+        if (_token != null && _token!.isNotEmpty) {
+          // 如果接口自己没有带 token header，再使用全局 token
+          if (!options.headers.containsKey(_tokenHeaderKey)) {
+            options.headers[_tokenHeaderKey] = '$_tokenPrefix$_token';
+          }
         }
       }
-    }
 
-    handler.next(options);
+      handler.next(options);
+    } on DioException catch (error) {
+      handler.reject(error);
+    }
   }
 
   @override

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -113,16 +114,122 @@ class StormyNetworkClient {
   }
 
   CancelToken _getOrCreateCancelToken(CancelToken? provided, String? tag) {
-    if (provided != null) return provided;
+    final token = provided ?? CancelToken();
     if (tag != null) {
-      final token = CancelToken();
+      final previous = _cancelTokens[tag];
+      if (previous != null &&
+          !identical(previous, token) &&
+          !previous.isCancelled) {
+        previous.cancel('Replaced by a newer request with tag: $tag');
+      }
       _cancelTokens[tag] = token;
-      return token;
     }
-    return CancelToken();
+    return token;
+  }
+
+  void _releaseCancelToken(String? tag, CancelToken token) {
+    if (tag != null && identical(_cancelTokens[tag], token)) {
+      _cancelTokens.remove(tag);
+    }
+  }
+
+  Stream<T> _manageResponseStream<T>(
+    Stream<T> source,
+    String? tag,
+    CancelToken token,
+  ) {
+    late final StreamController<T> controller;
+    StreamSubscription<T>? subscription;
+
+    void release() => _releaseCancelToken(tag, token);
+
+    controller = StreamController<T>(
+      sync: true,
+      onListen: () {
+        subscription = source.listen(
+          controller.add,
+          onError: (Object error, StackTrace stackTrace) {
+            release();
+            controller.addError(
+              ErrorHandler.handle(error, parsingConfig: _config.parsingConfig),
+              stackTrace,
+            );
+          },
+          onDone: () {
+            release();
+            unawaited(controller.close());
+          },
+        );
+      },
+      onPause: () => subscription?.pause(),
+      onResume: () => subscription?.resume(),
+      onCancel: () async {
+        release();
+        await subscription?.cancel();
+      },
+    );
+
+    return controller.stream;
   }
 
   /// ================ RESTful 请求核心能力封装 =================
+
+  /// 发起保留原始响应体的流式请求。
+  ///
+  /// 该方法不会经过 [ResponseParser]，调用方可以直接消费
+  /// [ResponseBody.stream] 并自行进行 SSE、NDJSON 等协议解帧。
+  Future<Response<ResponseBody>> requestStream(
+    String path, {
+    String method = 'GET',
+    dynamic data,
+    Map<String, dynamic>? query,
+    Options? options,
+    CancelToken? cancelToken,
+    String? cancelTag,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+    bool? requireToken,
+    bool? requireHeader,
+  }) async {
+    final managedToken = _getOrCreateCancelToken(cancelToken, cancelTag);
+    try {
+      final streamOptions =
+          _ensureOptions(
+            options?.copyWith(),
+            requireToken,
+            requireHeader,
+          ).copyWith(
+            method: method.toUpperCase(),
+            responseType: ResponseType.stream,
+          );
+
+      final response = await dio.request<ResponseBody>(
+        path,
+        data: data,
+        queryParameters: query,
+        options: streamOptions,
+        cancelToken: managedToken,
+        onSendProgress: onSendProgress,
+        onReceiveProgress: onReceiveProgress,
+      );
+
+      final responseBody = response.data;
+      if (responseBody != null) {
+        responseBody.stream = _manageResponseStream(
+          responseBody.stream,
+          cancelTag,
+          managedToken,
+        );
+      } else {
+        _releaseCancelToken(cancelTag, managedToken);
+      }
+
+      return response;
+    } catch (e) {
+      _releaseCancelToken(cancelTag, managedToken);
+      throw ErrorHandler.handle(e, parsingConfig: _config.parsingConfig);
+    }
+  }
 
   /// 发起 HTTP GET 请求
   Future<T> get<T>(
@@ -136,15 +243,18 @@ class StormyNetworkClient {
     bool? requireHeader,
     DataParser<T>? parser,
   }) async {
+    final managedToken = _getOrCreateCancelToken(cancelToken, cancelTag);
     return _request(
       () => dio.get(
         path,
         queryParameters: query,
         data: data,
         options: _ensureOptions(options, requireToken, requireHeader),
-        cancelToken: _getOrCreateCancelToken(cancelToken, cancelTag),
+        cancelToken: managedToken,
       ),
       parser: parser,
+      cancelTag: cancelTag,
+      managedToken: managedToken,
     );
   }
 
@@ -160,15 +270,18 @@ class StormyNetworkClient {
     bool? requireHeader,
     DataParser<T>? parser,
   }) async {
+    final managedToken = _getOrCreateCancelToken(cancelToken, cancelTag);
     return _request(
       () => dio.post(
         path,
         data: data,
         queryParameters: query,
         options: _ensureOptions(options, requireToken, requireHeader),
-        cancelToken: _getOrCreateCancelToken(cancelToken, cancelTag),
+        cancelToken: managedToken,
       ),
       parser: parser,
+      cancelTag: cancelTag,
+      managedToken: managedToken,
     );
   }
 
@@ -184,15 +297,18 @@ class StormyNetworkClient {
     bool? requireHeader,
     DataParser<T>? parser,
   }) async {
+    final managedToken = _getOrCreateCancelToken(cancelToken, cancelTag);
     return _request(
       () => dio.put(
         path,
         data: data,
         queryParameters: query,
         options: _ensureOptions(options, requireToken, requireHeader),
-        cancelToken: _getOrCreateCancelToken(cancelToken, cancelTag),
+        cancelToken: managedToken,
       ),
       parser: parser,
+      cancelTag: cancelTag,
+      managedToken: managedToken,
     );
   }
 
@@ -208,15 +324,18 @@ class StormyNetworkClient {
     bool? requireHeader,
     DataParser<T>? parser,
   }) async {
+    final managedToken = _getOrCreateCancelToken(cancelToken, cancelTag);
     return _request(
       () => dio.delete(
         path,
         data: data,
         queryParameters: query,
         options: _ensureOptions(options, requireToken, requireHeader),
-        cancelToken: _getOrCreateCancelToken(cancelToken, cancelTag),
+        cancelToken: managedToken,
       ),
       parser: parser,
+      cancelTag: cancelTag,
+      managedToken: managedToken,
     );
   }
 
@@ -232,17 +351,20 @@ class StormyNetworkClient {
     bool? requireToken,
     bool? requireHeader,
   }) async {
+    final managedToken = _getOrCreateCancelToken(cancelToken, cancelTag);
     try {
       return await dio.download(
         urlPath,
         savePath,
         onReceiveProgress: onReceiveProgress,
         queryParameters: queryParameters,
-        cancelToken: _getOrCreateCancelToken(cancelToken, cancelTag),
+        cancelToken: managedToken,
         options: _ensureOptions(options, requireToken, requireHeader),
       );
     } catch (e) {
       throw ErrorHandler.handle(e, parsingConfig: _config.parsingConfig);
+    } finally {
+      _releaseCancelToken(cancelTag, managedToken);
     }
   }
 
@@ -259,16 +381,19 @@ class StormyNetworkClient {
     bool? requireHeader,
     DataParser<T>? parser,
   }) async {
+    final managedToken = _getOrCreateCancelToken(cancelToken, cancelTag);
     return _request(
       () => dio.post(
         path,
         data: data,
         queryParameters: query,
         options: _ensureOptions(options, requireToken, requireHeader),
-        cancelToken: _getOrCreateCancelToken(cancelToken, cancelTag),
+        cancelToken: managedToken,
         onSendProgress: onSendProgress,
       ),
       parser: parser,
+      cancelTag: cancelTag,
+      managedToken: managedToken,
     );
   }
 
@@ -290,6 +415,8 @@ class StormyNetworkClient {
   Future<T> _request<T>(
     Future<Response<dynamic>> Function() execution, {
     DataParser<T>? parser,
+    String? cancelTag,
+    required CancelToken managedToken,
   }) async {
     try {
       // 1. 发起底层的 Dio 调度
@@ -318,6 +445,8 @@ class StormyNetworkClient {
     } catch (e) {
       // Dio层错误及我们预先抛出的业务错误会在包装后以安全、健壮和具备提示语的统一样貌出战
       throw ErrorHandler.handle(e, parsingConfig: _config.parsingConfig);
+    } finally {
+      _releaseCancelToken(cancelTag, managedToken);
     }
   }
 }

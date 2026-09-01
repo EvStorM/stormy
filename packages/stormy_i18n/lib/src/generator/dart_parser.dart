@@ -57,7 +57,7 @@ class _I18nVisitor extends RecursiveAstVisitor<void> {
 
   @override
   void visitClassDeclaration(ClassDeclaration node) {
-    _currentClassName = node.name.lexeme;
+    _currentClassName = node.namePart.typeName.lexeme;
     super.visitClassDeclaration(node);
     _currentClassName = null;
   }
@@ -89,9 +89,9 @@ class _I18nVisitor extends RecursiveAstVisitor<void> {
       Map<String, dynamic>? placeholders;
 
       for (var arg in argumentList.arguments) {
-        if (arg is NamedExpression) {
-          final paramName = arg.name.label.name;
-          final expr = arg.expression;
+        if (arg is NamedArgument) {
+          final paramName = arg.name.lexeme;
+          final expr = arg.argumentExpression;
 
           if (paramName == 'key') {
             if (expr is StringLiteral) explicitKey = expr.stringValue;
@@ -202,9 +202,9 @@ class _I18nVisitor extends RecursiveAstVisitor<void> {
 
     // Remaining arguments are named
     for (var arg in args) {
-      if (arg is NamedExpression) {
-        final name = arg.name.label.name;
-        final valExpr = arg.expression;
+      if (arg is NamedArgument) {
+        final name = arg.name.lexeme;
+        final valExpr = arg.argumentExpression;
         dynamic value;
 
         if (valExpr is StringLiteral) {

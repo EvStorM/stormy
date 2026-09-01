@@ -33,6 +33,49 @@ lib/
 
 ## 快速开始
 
+### 1.1.0 启动与方向配置
+
+`StormyApp` 会在构建业务界面前等待基础初始化完成，并使用传入的
+`designSize` 初始化 `flutter_screenutil`。默认仍锁定竖屏；传入空列表可将
+方向交由平台工程和系统管理：
+
+```dart
+StormyApp(
+  appModel: AppModel.defaults().copyWith(
+    designSize: const Size(390, 844),
+    preferredOrientations: const [],
+  ),
+  router: router,
+);
+```
+
+流式接口可使用 `requestStream` 获取原始 `ResponseBody`，SSE/NDJSON 的解码
+由业务层完成：
+
+```dart
+final response = await client.requestStream(
+  '/v1/events',
+  method: 'POST',
+  data: requestBody,
+  cancelTag: 'events',
+);
+
+await for (final bytes in response.data!.stream) {
+  // 增量解码 bytes；不要假设网络 chunk 等于协议帧。
+}
+```
+
+Flutter 3.47.1 项目同时使用 `hive_ce_generator 1.11.3` 时，需要在客户端
+固定 analyzer 14，以协调 Flutter 固定的测试依赖与 Riverpod 的传递依赖：
+
+```yaml
+dependency_overrides:
+  analyzer: 14.0.0
+```
+
+该 override 应留在客户端而不是依赖包中，并在 Flutter 的 `test_api` pin
+升级后重新验证是否仍有必要。
+
 ### 1. 安装依赖
 
 ```bash

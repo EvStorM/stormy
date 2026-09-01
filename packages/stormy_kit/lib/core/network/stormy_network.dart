@@ -4,6 +4,8 @@
 export 'package:dio/dio.dart'
     show
         DioException,
+        ResponseBody,
+        ResponseType,
         Response,
         Options,
         CancelToken,

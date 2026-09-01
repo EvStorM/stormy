@@ -1,29 +1,38 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:stormy_kit/stormy_kit.dart';
 
 void main() {
-  test('Network Call Test', () async {
+  test('maps a server error without calling the public internet', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    addTearDown(() => server.close(force: true));
+    server.listen((request) async {
+      request.response
+        ..statusCode = HttpStatus.internalServerError
+        ..headers.contentType = ContentType.json
+        ..write('{"message":"test failure"}');
+      await request.response.close();
+    });
+
     final client = StormyNetworkClient(
       config: StormyNetworkConfig(
-        parsingConfig: ResponseParsingConfig(messageKey: "message", successCode: 200),
-        baseUrl: "https://qiaopai.wzglob.top/api/open",
-        enableLog: true,
+        baseUrl: 'http://${server.address.host}:${server.port}',
+        enableLog: false,
         defaultRequireToken: false,
         defaultRequireHeader: false,
-      )
+      ),
     );
 
-    try {
-      final res = await client.get(
-        '/style-background-configs',
-        requireToken: false,
-        parser: const DirectParser(),
-      );
-      print("SUCCESS RESPONSE: $res");
-    } catch (e, st) {
-      print("ERROR CAUGHT: ${e.runtimeType}: $e");
-      print("STACK TRACE:\n$st");
-      rethrow;
-    }
+    await expectLater(
+      client.get<Object?>('/failure'),
+      throwsA(
+        isA<ServerException>().having(
+          (error) => error.statusCode,
+          'statusCode',
+          HttpStatus.internalServerError,
+        ),
+      ),
+    );
   });
 }
