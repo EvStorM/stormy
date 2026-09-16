@@ -1,1 +1,6 @@
 /.DS_Store
+.dart_tool/
+build/
+/temp/
+.fvm/
+__pycache__/

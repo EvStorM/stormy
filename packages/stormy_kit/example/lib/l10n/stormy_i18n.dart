@@ -46,8 +46,7 @@ class I18nPlaceholder {
     int? decimalDigits,
   }) : this._(type: 'int', format: 'compactSimpleCurrency');
 
-  const I18nPlaceholder.intCompactLong()
-      : this._(type: 'int', format: 'compactLong');
+  const I18nPlaceholder.intCompactLong() : this._(type: 'int', format: 'compactLong');
 
   const I18nPlaceholder.intCurrency({
     String? name,
@@ -56,8 +55,7 @@ class I18nPlaceholder {
     String? customPattern,
   }) : this._(type: 'int', format: 'currency');
 
-  const I18nPlaceholder.intDecimalPattern()
-      : this._(type: 'int', format: 'decimalPattern');
+  const I18nPlaceholder.intDecimalPattern() : this._(type: 'int', format: 'decimalPattern');
 
   const I18nPlaceholder.intDecimalPatternDigits({
     int? decimalDigits,
@@ -67,11 +65,9 @@ class I18nPlaceholder {
     int? decimalDigits,
   }) : this._(type: 'int', format: 'decimalPercentPattern');
 
-  const I18nPlaceholder.intPercentPattern()
-      : this._(type: 'int', format: 'percentPattern');
+  const I18nPlaceholder.intPercentPattern() : this._(type: 'int', format: 'percentPattern');
 
-  const I18nPlaceholder.intScientificPattern()
-      : this._(type: 'int', format: 'scientificPattern');
+  const I18nPlaceholder.intScientificPattern() : this._(type: 'int', format: 'scientificPattern');
 
   const I18nPlaceholder.intSimpleCurrency({
     String? name,
@@ -92,21 +88,21 @@ class I18nItem {
   final String? key;
   final String? description;
   final Map<String, I18nPlaceholder>? placeholders;
-  final String zhCN;
-  final String enUS;
+  final String zh_CN;
+  final String en_US;
 
   const I18nItem({
     this.key,
     this.description,
     this.placeholders,
-    required this.zhCN,
-    required this.enUS,
+    required this.zh_CN,
+    required this.en_US,
   });
 
   /// 返回所有支持的语种及文本映射，用于构建 ARB 时解析使用
   Map<String, String> get values => {
-        'zh_CN': zhCN,
-        'en_US': enUS,
+        'zh_CN': zh_CN,
+        'en_US': en_US,
       };
 }
 
@@ -127,15 +123,17 @@ extension StormyL10nExtension on BuildContext {
     }
     return localizations;
   }
+
 }
 
 /// [StormyLocales] 提供了精确的 [Locale] 定义。
 /// 使用了高级本地化标志（如包含 scriptCode 与 countryCode），确保了真正的国家/地区分离及高精度匹配。
 class StormyLocales {
-  static const Locale zhCN =
-      Locale.fromSubtags(languageCode: 'zh', countryCode: 'CN');
-  static const Locale enUS =
-      Locale.fromSubtags(languageCode: 'en', countryCode: 'US');
+  static const Locale zh_CN = Locale.fromSubtags(languageCode: 'zh', countryCode: 'CN');
+  static const Locale en_US = Locale.fromSubtags(languageCode: 'en', countryCode: 'US');
 
-  static const List<Locale> supportedLocales = [zhCN, enUS];
+  static const List<Locale> supportedLocales = [
+    zh_CN,
+    en_US
+  ];
 }

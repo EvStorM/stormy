@@ -1,8 +1,9 @@
 import 'dart:async';
 
 import 'package:fluwx/fluwx.dart';
-import 'package:stormy_kit/stormy_kit.dart';
-import 'package:tobias/tobias.dart';
+import 'package:stormy_core/stormy_core.dart';
+import 'package:stormy_platform/stormy_platform.dart';
+
 import 'src/wechat/wechat_sdk.dart';
 import 'src/wechat/wechat_config.dart';
 import 'src/alipay/alipay_sdk.dart';
@@ -35,7 +36,9 @@ class PayResult {
   final SDKPaymentType type;
 
   /// 是否成功
-  final bool isSuccess;
+  final PayStatus status;
+
+  bool get isSuccess => status == PayStatus.platformSucceeded;
 
   /// 是否是签约类型
   final bool isSignType;
@@ -48,7 +51,7 @@ class PayResult {
 
   PayResult({
     required this.type,
-    required this.isSuccess,
+    required this.status,
     required this.orderInfo,
     this.isSignType = false,
     this.errorMessage,
@@ -61,19 +64,38 @@ class PayResult {
 /// 可以统一管理微信和支付宝两个SDK
 class StormyChinaPay {
   /// 单例实例
-  static final StormyChinaPay _instance = StormyChinaPay._internal();
+  static StormyChinaPay? _instance;
 
   /// 工厂构造函数
-  factory StormyChinaPay() => _instance;
+  factory StormyChinaPay() => _instance ??= StormyChinaPay.withAdapters(
+    weChat: WechatSDK(),
+    alipay: AlipaySDK(),
+  );
 
   /// 私有构造函数
-  StormyChinaPay._internal();
+  StormyChinaPay.withAdapters({
+    required WechatSDK weChat,
+    required AlipaySDK alipay,
+  }) : _weChatSDK = weChat,
+       _alipaySDK = alipay;
+
+  bool _disposed = false;
+  Future<void>? _weChatInitialization;
+  Future<void>? _alipayInitialization;
+  Future<void>? _disposal;
+  bool _weChatListening = false;
+  bool _alipayListening = false;
+  final List<StreamSubscription<dynamic>> _subscriptions = [];
+
+  void _checkActive() {
+    if (_disposed) throw StateError('StormyChinaPay 已销毁，请获取新实例');
+  }
 
   /// 微信SDK实例
-  final WechatSDK _weChatSDK = WechatSDK();
+  final WechatSDK _weChatSDK;
 
   /// 支付宝SDK实例
-  final AlipaySDK _alipaySDK = AlipaySDK();
+  final AlipaySDK _alipaySDK;
 
   /// 微信支付是否启用
   bool _weChatEnabled = true;
@@ -106,16 +128,24 @@ class StormyChinaPay {
   ///
   /// [config] 配置信息，如果为 null 则使用默认配置
   Future<void> initWeChat([WechatConfig? config]) async {
-    await _weChatSDK.init(config);
+    _checkActive();
     _setupWeChatListeners();
+    await (_weChatInitialization ??= _weChatSDK
+        .init(config)
+        .whenComplete(() => _weChatInitialization = null));
+    _checkActive();
   }
 
   /// 初始化支付宝SDK
   ///
   /// [config] 配置信息，如果为 null 则使用默认配置
   Future<void> initAlipay([AlipayConfig? config]) async {
-    await _alipaySDK.init(config);
+    _checkActive();
     _setupAlipayListeners();
+    await (_alipayInitialization ??= _alipaySDK
+        .init(config)
+        .whenComplete(() => _alipayInitialization = null));
+    _checkActive();
   }
 
   /// 同时初始化所有SDK
@@ -136,34 +166,39 @@ class StormyChinaPay {
 
   /// 设置微信事件监听
   void _setupWeChatListeners() {
-    _weChatSDK.paymentStream.listen((event) {
-      _paymentController.add(event);
-    });
-
-    _weChatSDK.shareStream.listen((event) {
-      _shareController.add(event);
-    });
-
-    _weChatSDK.authStream.listen((event) {
-      _authController.add(event);
-    });
+    if (_weChatListening) return;
+    _weChatListening = true;
+    _subscriptions.addAll([
+      _weChatSDK.paymentStream.listen((event) {
+        if (!_disposed) _paymentController.add(event);
+      }),
+      _weChatSDK.shareStream.listen((event) {
+        if (!_disposed) _shareController.add(event);
+      }),
+      _weChatSDK.authStream.listen((event) {
+        if (!_disposed) _authController.add(event);
+      }),
+    ]);
   }
 
-  /// 设置支付宝事件监听
   void _setupAlipayListeners() {
-    _alipaySDK.paymentStream.listen((event) {
-      _paymentController.add(event);
-    });
-
-    _alipaySDK.authStream.listen((event) {
-      _authController.add(event);
-    });
+    if (_alipayListening) return;
+    _alipayListening = true;
+    _subscriptions.addAll([
+      _alipaySDK.paymentStream.listen((event) {
+        if (!_disposed) _paymentController.add(event);
+      }),
+      _alipaySDK.authStream.listen((event) {
+        if (!_disposed) _authController.add(event);
+      }),
+    ]);
   }
 
   /// 启用/禁用微信支付
   ///
   /// [enabled] 是否启用
   void setWeChatEnabled(bool enabled) {
+    _checkActive();
     _weChatEnabled = enabled;
     StormyLog.i('StormyChinaPay: 微信支付 ${enabled ? "已启用" : "已禁用"}');
   }
@@ -172,6 +207,7 @@ class StormyChinaPay {
   ///
   /// [enabled] 是否启用
   void setAlipayEnabled(bool enabled) {
+    _checkActive();
     _alipayEnabled = enabled;
     StormyLog.i('StormyChinaPay: 支付宝支付 ${enabled ? "已启用" : "已禁用"}');
   }
@@ -196,11 +232,12 @@ class StormyChinaPay {
     Payment? weChatPayment,
     bool isAuth = false,
   }) async {
+    _checkActive();
     if (type == SDKPaymentType.weChat) {
       if (!_weChatEnabled) {
         return PayResult(
           type: type,
-          isSuccess: false,
+          status: PayStatus.failed,
           orderInfo: orderInfo,
           errorMessage: '微信支付已禁用',
         );
@@ -209,7 +246,7 @@ class StormyChinaPay {
       if (weChatPayment == null) {
         return PayResult(
           type: type,
-          isSuccess: false,
+          status: PayStatus.failed,
           orderInfo: orderInfo,
           errorMessage: '微信支付需要提供 Payment 参数',
         );
@@ -218,7 +255,7 @@ class StormyChinaPay {
       final result = await _weChatSDK.pay(weChatPayment, orderInfo);
       return PayResult(
         type: type,
-        isSuccess: result,
+        status: result ? PayStatus.launched : PayStatus.failed,
         orderInfo: orderInfo,
         errorMessage: result ? null : '微信支付请求失败',
       );
@@ -226,7 +263,7 @@ class StormyChinaPay {
       if (!_alipayEnabled) {
         return PayResult(
           type: type,
-          isSuccess: false,
+          status: PayStatus.failed,
           orderInfo: orderInfo,
           errorMessage: '支付宝支付已禁用',
         );
@@ -235,14 +272,15 @@ class StormyChinaPay {
       final result = await _alipaySDK.pay(orderInfo, isAuth: isAuth);
       return PayResult(
         type: type,
-        isSuccess: result,
+        status: result,
+        isSignType: isAuth,
         orderInfo: orderInfo,
-        errorMessage: result ? null : '支付宝支付失败',
+        errorMessage: result == PayStatus.failed ? '支付宝支付失败' : null,
       );
     } else {
       return PayResult(
         type: type,
-        isSuccess: false,
+        status: PayStatus.failed,
         orderInfo: orderInfo,
         errorMessage: '不支持的支付类型',
       );
@@ -251,9 +289,9 @@ class StormyChinaPay {
 
   /// 检查微信是否安装
   Future<bool> isWeChatInstalled() async {
+    _checkActive();
     try {
-      final fluwx = Fluwx();
-      return await fluwx.isWeChatInstalled;
+      return await _weChatSDK.fluwx.isWeChatInstalled;
     } catch (e) {
       StormyLog.e(
         'StormyChinaPay.isWeChatInstalled: 检查失败',
@@ -265,9 +303,9 @@ class StormyChinaPay {
 
   /// 检查支付宝是否安装
   Future<bool> isAlipayInstalled() async {
+    _checkActive();
     try {
-      final tobias = Tobias();
-      return await tobias.isAliPayInstalled;
+      return await _alipaySDK.tobias.isAliPayInstalled;
     } catch (e) {
       StormyLog.e(
         'StormyChinaPay.isAlipayInstalled: 检查失败',
@@ -289,6 +327,7 @@ class StormyChinaPay {
     SharePlatform platform = SharePlatform.weChat,
     WeChatScene? scene,
   }) async {
+    _checkActive();
     if (platform == SharePlatform.weChat) {
       return await _weChatSDK.shareImage(
         image,
@@ -309,6 +348,7 @@ class StormyChinaPay {
   StreamSubscription<PaymentEvent> listenPaymentOnce(
     void Function(PaymentEvent) callback,
   ) {
+    _checkActive();
     late StreamSubscription<PaymentEvent> subscription;
     subscription = paymentStream.listen((event) {
       callback(event);
@@ -321,6 +361,7 @@ class StormyChinaPay {
   StreamSubscription<ShareEvent> listenShareOnce(
     void Function(ShareEvent) callback,
   ) {
+    _checkActive();
     late StreamSubscription<ShareEvent> subscription;
     subscription = shareStream.listen((event) {
       callback(event);
@@ -333,6 +374,7 @@ class StormyChinaPay {
   StreamSubscription<AuthEvent> listenAuthOnce(
     void Function(AuthEvent) callback,
   ) {
+    _checkActive();
     late StreamSubscription<AuthEvent> subscription;
     subscription = authStream.listen((event) {
       callback(event);
@@ -348,12 +390,20 @@ class StormyChinaPay {
   AlipaySDK get alipaySDK => _alipaySDK;
 
   /// 释放资源
-  Future<void> dispose() async {
-    await _weChatSDK.dispose();
-    await _alipaySDK.dispose();
-    await _paymentController.close();
-    await _shareController.close();
-    await _authController.close();
-    StormyLog.i('StormyChinaPay: 资源已释放');
+  Future<void> dispose() => _disposal ??= _dispose();
+
+  Future<void> _dispose() async {
+    _disposed = true;
+    if (identical(_instance, this)) _instance = null;
+    await Future.wait(
+      _subscriptions.map((subscription) => subscription.cancel()),
+    );
+    _subscriptions.clear();
+    await Future.wait([_weChatSDK.dispose(), _alipaySDK.dispose()]);
+    await Future.wait([
+      _paymentController.close(),
+      _shareController.close(),
+      _authController.close(),
+    ]);
   }
 }

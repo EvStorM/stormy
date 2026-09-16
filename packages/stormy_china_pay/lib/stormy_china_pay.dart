@@ -3,6 +3,8 @@
 /// 统一支付SDK，支持微信支付、支付宝支付等功能
 library;
 
+export 'package:fluwx/fluwx.dart' show Payment;
+
 // Wechat SDK
 export 'src/wechat/wechat_config.dart';
 export 'src/wechat/wechat_sdk.dart';

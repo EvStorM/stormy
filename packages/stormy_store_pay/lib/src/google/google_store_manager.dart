@@ -11,7 +11,8 @@ import '../utils/store_product_mapper.dart';
 
 /// Google Play 内购管理器实现
 class GoogleStoreManager implements StorePayManagerBase {
-  final InAppPurchase _inAppPurchase = InAppPurchase.instance;
+  final InAppPurchase _inAppPurchase;
+  bool _disposed = false;
   StreamSubscription<List<PurchaseDetails>>? _subscription;
 
   // ========== 配置 ==========
@@ -19,10 +20,9 @@ class GoogleStoreManager implements StorePayManagerBase {
   late final StoreProductMapper _mapper;
   final Set<String> _consumableIds = {};
 
-  GoogleStoreManager() {
-    _mapper = StoreProductMapper(
-      isConsumable: _isConsumableProductById,
-    );
+  GoogleStoreManager({InAppPurchase? inAppPurchase})
+    : _inAppPurchase = inAppPurchase ?? InAppPurchase.instance {
+    _mapper = StoreProductMapper(isConsumable: _isConsumableProductById);
   }
 
   // ========== 状态管理 ==========
@@ -31,10 +31,10 @@ class GoogleStoreManager implements StorePayManagerBase {
   );
   bool _isAvailable = false;
   final ValueNotifier<bool> _isLoadingNotifier = ValueNotifier(false);
-  
+
   // 缓存统一格式的商品。对于 Android，键是 `${productId}:${basePlanId}`，普通应用内商品是 `${productId}`
   final Map<String, StoreProductInfo> _productCache = {};
-  
+
   final List<PurchaseDetails> _purchases = [];
   String? _errorMessage;
 
@@ -99,6 +99,7 @@ class GoogleStoreManager implements StorePayManagerBase {
 
   @override
   void setConfig(StorePayConfig config) {
+    if (_disposed) throw StateError("Store manager disposed");
     _config = config;
     _consumableIds.addAll(config.consumableProductIds);
   }
@@ -108,33 +109,27 @@ class GoogleStoreManager implements StorePayManagerBase {
   }
 
   // ========== 核心方法 ==========
-  Completer<bool>? _initCompleter;
+  Future<bool>? _initialization;
 
   @override
-  Future<bool> initialize() async {
-    if (_statusNotifier.value == IAPStatus.initialized) {
-      debugPrint('[Google Play] 内购管理器已经初始化，跳过重复初始化');
-      return true;
-    }
+  Future<bool> initialize() {
+    if (_disposed) throw StateError('内购平台实例已销毁');
+    if (isInitialized) return Future.value(true);
+    return _initialization ??= _initializeOnce().whenComplete(
+      () => _initialization = null,
+    );
+  }
 
-    if (_initCompleter != null) {
-      debugPrint('[Google Play] 内购管理器正在初始化中，等待完成...');
-      return await _initCompleter!.future;
-    }
-
-    _initCompleter = Completer<bool>();
+  Future<bool> _initializeOnce() async {
     _statusNotifier.value = IAPStatus.initializing;
-
     try {
       if (_purchaseVerifier == null) {
-        _setError(
-          'Google Play 内购初始化前必须先注入购买验证器',
-          IAPStatus.initializeFailed,
-        );
+        _setError('Google Play 内购初始化前必须先注入购买验证器', IAPStatus.initializeFailed);
         return false;
       }
 
       _isAvailable = await _inAppPurchase.isAvailable();
+      if (_disposed) return false;
 
       if (!_isAvailable) {
         _setError('Google Play 内购服务不可用', IAPStatus.initializeFailed);
@@ -142,7 +137,16 @@ class GoogleStoreManager implements StorePayManagerBase {
       }
 
       _subscription = _inAppPurchase.purchaseStream.listen(
-        _handlePurchaseUpdates,
+        (updates) {
+          unawaited(
+            _handlePurchaseUpdates(updates).catchError((
+              Object error,
+              StackTrace stack,
+            ) {
+              _notifyPurchaseError(_buildErrorEvent('处理购买事件失败', cause: error));
+            }),
+          );
+        },
         onError: (error) {
           _notifyPurchaseError(
             _buildErrorEvent('购买监听错误: $error', cause: error),
@@ -152,13 +156,11 @@ class GoogleStoreManager implements StorePayManagerBase {
 
       _statusNotifier.value = IAPStatus.initialized;
       debugPrint('[Google Play] 内购管理器初始化成功');
-      _initCompleter?.complete(true);
-      _initCompleter = null;
+
       return true;
     } catch (e) {
       _setError('初始化失败: $e', IAPStatus.initializeFailed);
-      _initCompleter?.complete(false);
-      _initCompleter = null;
+
       return false;
     }
   }
@@ -185,6 +187,7 @@ class GoogleStoreManager implements StorePayManagerBase {
         productIds.toSet(),
       );
 
+      if (_disposed) return [];
       if (response.error != null) {
         _notifyPurchaseError(_buildErrorEvent(response.error!.message));
         return [];
@@ -192,8 +195,10 @@ class GoogleStoreManager implements StorePayManagerBase {
 
       final unifiedProducts = _mapper.mapProducts(response.productDetails);
       cacheProducts(unifiedProducts, notifyListeners: true);
-      
-      debugPrint('[Google Play] 查询到 ${response.productDetails.length} 个基础产品模型，扁平化展开后共 ${unifiedProducts.length} 个展平项');
+
+      debugPrint(
+        '[Google Play] 查询到 ${response.productDetails.length} 个基础产品模型，扁平化展开后共 ${unifiedProducts.length} 个展平项',
+      );
       return unifiedProducts;
     } catch (e) {
       _notifyPurchaseError(_buildErrorEvent('查询产品失败: $e'));
@@ -241,7 +246,11 @@ class GoogleStoreManager implements StorePayManagerBase {
       return true;
     } catch (e) {
       _notifyPurchaseError(
-        _buildErrorEvent('购买失败: $e', productId: productInfo.nativeProductId, cause: e),
+        _buildErrorEvent(
+          '购买失败: $e',
+          productId: productInfo.nativeProductId,
+          cause: e,
+        ),
       );
       return false;
     }
@@ -267,6 +276,7 @@ class GoogleStoreManager implements StorePayManagerBase {
     List<StoreProductInfo> products, {
     bool notifyListeners = false,
   }) {
+    if (_disposed) throw StateError("Store manager disposed");
     if (products.isEmpty) return;
 
     for (final product in products) {
@@ -280,11 +290,13 @@ class GoogleStoreManager implements StorePayManagerBase {
 
   @override
   StoreProductInfo? getProduct(String unifiedId) {
+    if (_disposed) throw StateError("Store manager disposed");
     return _productCache[unifiedId];
   }
 
   @override
   bool hasPurchased(String nativeProductId) {
+    if (_disposed) throw StateError("Store manager disposed");
     return _purchases.any(
       (purchase) =>
           purchase.productID == nativeProductId &&
@@ -293,15 +305,16 @@ class GoogleStoreManager implements StorePayManagerBase {
     );
   }
 
-
-
   @override
   void setPurchaseVerifier(PurchaseVerifier? verifier) {
+    if (_disposed) throw StateError("Store manager disposed");
     _purchaseVerifier = verifier;
   }
 
   @override
   void dispose() {
+    if (_disposed) return;
+    _disposed = true;
     _subscription?.cancel();
     _statusNotifier.dispose();
     _isLoadingNotifier.dispose();
@@ -318,6 +331,7 @@ class GoogleStoreManager implements StorePayManagerBase {
 
   // ========== 内部通知方法 ==========
   void _notifyPurchaseEvent(IAPPurchaseEvent event) {
+    if (_disposed) return;
     _purchaseSuccessController.add(event);
 
     if (event.isRestored) {
@@ -326,6 +340,7 @@ class GoogleStoreManager implements StorePayManagerBase {
   }
 
   void _notifyPurchaseError(IAPPurchaseErrorEvent errorEvent) {
+    if (_disposed) return;
     _purchaseErrorController.add(errorEvent);
   }
 
@@ -346,6 +361,7 @@ class GoogleStoreManager implements StorePayManagerBase {
   }
 
   void _notifyProductsLoaded(List<StoreProductInfo> products) {
+    if (_disposed) return;
     _productsLoadedController.add(products);
   }
 
@@ -366,6 +382,7 @@ class GoogleStoreManager implements StorePayManagerBase {
 
   // ========== 内部验证方法 ==========
   bool _checkInitialized() {
+    if (_disposed) throw StateError('内购平台实例已销毁');
     if (!isInitialized) {
       _errorMessage = '内购管理器未初始化，请先调用 initialize()';
       _notifyPurchaseError(_buildErrorEvent(_errorMessage!));
@@ -397,6 +414,7 @@ class GoogleStoreManager implements StorePayManagerBase {
     List<PurchaseDetails> purchaseDetailsList,
   ) async {
     for (final PurchaseDetails purchaseDetails in purchaseDetailsList) {
+      if (_disposed) return;
       if (purchaseDetails.status == PurchaseStatus.pending) {
         debugPrint('[Google Play] 购买进行中: ${purchaseDetails.productID}');
         continue;
@@ -413,7 +431,13 @@ class GoogleStoreManager implements StorePayManagerBase {
 
       if (purchaseDetails.status == PurchaseStatus.canceled) {
         debugPrint('[Google Play] 购买已取消: ${purchaseDetails.productID}');
-        _notifyPurchaseError(_buildErrorEvent('用户取消了购买', details: purchaseDetails, status: PurchaseStatus.canceled));
+        _notifyPurchaseError(
+          _buildErrorEvent(
+            '用户取消了购买',
+            details: purchaseDetails,
+            status: PurchaseStatus.canceled,
+          ),
+        );
         if (_config.autoCompletePurchases &&
             purchaseDetails.pendingCompletePurchase) {
           await _inAppPurchase.completePurchase(purchaseDetails);
@@ -430,6 +454,7 @@ class GoogleStoreManager implements StorePayManagerBase {
           verified = false;
         }
 
+        if (_disposed) return;
         if (verified) {
           await _handleSuccessfulPurchase(
             purchaseDetails,
@@ -438,7 +463,8 @@ class GoogleStoreManager implements StorePayManagerBase {
                 : IAPPurchaseLifecycle.restored,
           );
 
-          if (_config.autoCompletePurchases &&
+          if (!_disposed &&
+              _config.autoCompletePurchases &&
               purchaseDetails.pendingCompletePurchase) {
             await _inAppPurchase.completePurchase(purchaseDetails);
           }
@@ -537,20 +563,20 @@ class GoogleStoreManager implements StorePayManagerBase {
 
   // ========== 内部辅助方法 ==========
 
-
-
   void _setError(String message, IAPStatus status) {
+    if (_disposed) return;
     _errorMessage = message;
     _statusNotifier.value = status;
     debugPrint('[Google Play] $_errorMessage');
   }
 
   Future<T> _runWithLoading<T>(Future<T> Function() runner) async {
+    if (_disposed) throw StateError('内购平台实例已销毁');
     _isLoadingNotifier.value = true;
     try {
       return await runner();
     } finally {
-      _isLoadingNotifier.value = false;
+      if (!_disposed) _isLoadingNotifier.value = false;
     }
   }
 }

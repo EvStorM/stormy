@@ -47,8 +47,8 @@ void main() {
       expect(result, isFalse);
     });
 
-    test('dispose should clear platform manager', () {
-      StorePayManager.instance.dispose();
+    test('dispose should clear platform manager', () async {
+      await StorePayManager.instance.dispose();
       expect(StorePayManager.instance.isInitialized, isFalse);
       expect(StorePayManager.instance.googleExtension, isNull);
       expect(StorePayManager.instance.appleExtension, isNull);

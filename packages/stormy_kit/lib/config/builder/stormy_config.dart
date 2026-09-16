@@ -1,17 +1,18 @@
-import '../models/dialog_config.dart';
-import '../models/storage_config.dart';
-import '../models/refresh_config.dart';
-import '../models/stormy_theme_config.dart';
-import '../models/i18n_config.dart';
+import 'package:stormy_ui/config/models/dialog_config.dart';
+import 'package:stormy_core/config/models/storage_config.dart';
+import 'package:stormy_ui/config/models/refresh_config.dart';
+import 'package:stormy_ui/config/models/stormy_theme_config.dart';
+import 'package:stormy_ui/config/models/i18n_config.dart';
+
 import '../accessor/config_accessor.dart';
 
 import 'package:flutter/widgets.dart'; // Locale needed here or we can use dart:ui
 import 'package:stormy_i18n/stormy_i18n.dart';
 
-import '../../core/network/stormy_network.dart';
-import '../../core/dialog/stormy_dialog.dart';
-import '../../core/storage/stormy_storage.dart';
-import '../../core/refresh/stormy_refresh.dart';
+import 'package:stormy_core/core/network/stormy_network.dart';
+import 'package:stormy_ui/core/dialog/stormy_dialog.dart';
+import 'package:stormy_core/core/storage/stormy_storage.dart';
+import 'package:stormy_ui/core/refresh/stormy_refresh.dart';
 
 /// 配置验证结果
 class ConfigValidationResult {
@@ -60,14 +61,22 @@ class StormyConfig {
   ConfigValidationResult validate() {
     final errors = <String>[];
 
-    if (network == null) {
-      errors.add('network 未配置');
-    } else if (network!.baseUrl.isEmpty) {
+    if (network != null && network!.baseUrl.isEmpty) {
       errors.add('network.baseUrl 不能为空');
     }
 
-    if (storage == null) {
-      errors.add('storage 未配置');
+    if (storage != null) {
+      final names = storage!.buckets.map((bucket) => bucket.name).toList();
+      if (names.isEmpty ||
+          names.toSet().length != names.length ||
+          !names.contains(storage!.defaultBucketName)) {
+        errors.add('storage 分区必须非空、名称唯一且包含默认分区');
+      }
+    }
+    if (i18n != null &&
+        storage == null &&
+        !StormyStorage.instance.isInitialized) {
+      errors.add('i18n 的语言持久化需要先配置 storage');
     }
 
     return errors.isEmpty
@@ -86,113 +95,90 @@ class StormyConfig {
   /// 应用配置到各个模块
   /// 返回应用结果
   Future<StormyConfigApplied> apply() async {
-    bool networkApplied = false;
-    bool dialogApplied = false;
-    bool storageApplied = false;
-    bool refreshApplied = false;
-    bool themeApplied = false;
-    bool localizationApplied = false;
-    final List<String> sdkApplied = [];
-
-    // 存储配置到全局访问器
-    StormyConfigAccessor.initialize(theme: theme, i18n: i18n);
-
-    // 应用网络配置
-    if (network != null) {
+    final modules = <StormyModule, ModuleApplyResult>{};
+    Future<void> applyModule(
+      StormyModule module,
+      Future<void> Function() action,
+    ) async {
       try {
+        await action();
+        modules[module] = const ModuleApplyResult.applied();
+      } catch (error, stackTrace) {
+        modules[module] = ModuleApplyResult.failed(error, stackTrace);
+      }
+    }
+
+    if (network != null) {
+      await applyModule(StormyModule.network, () async {
         final client = StormyNetworkClient(config: network!);
         StormyConfigAccessor.setNetworkClient(client);
-        networkApplied = true;
-      } catch (e) {
-        print('网络配置应用失败: $e');
-      }
+      });
     }
-
-    // 应用弹窗配置
     if (dialog != null) {
-      try {
+      await applyModule(StormyModule.dialog, () async {
         StormyDialog.instance.initialize(dialog!);
-        dialogApplied = true;
-      } catch (e) {
-        print('弹窗配置应用失败: $e');
-      }
+      });
     }
-
-    // 应用存储配置
     if (storage != null) {
-      try {
+      await applyModule(StormyModule.storage, () async {
         await StormyStorage.instance.initialize(
           config: storage!,
           registerAdapters: storage!.registerAdapters,
+          engine: storage!.engine,
         );
-        storageApplied = true;
-      } catch (e) {
-        print('存储配置应用失败: $e');
-      }
+      });
     }
-
-    // 应用刷新配置
     if (refresh != null) {
-      try {
+      await applyModule(StormyModule.refresh, () async {
         StormyRefresh.instance.initialize(refresh!);
-        refreshApplied = true;
-      } catch (e) {
-        print('刷新配置应用失败: $e');
-      }
+      });
     }
-
-    // 主题配置需要外部应用（ThemeProvider）
     if (theme != null) {
-      themeApplied = true;
+      await applyModule(StormyModule.theme, () async {
+        StormyConfigAccessor.setTheme(theme!);
+      });
     }
-
-    // 应用国际化配置
     if (i18n != null) {
-      try {
-        if (!storageApplied) {
-          print('警告: I18n 依赖 Storage，但 Storage 未配置或应用失败');
+      await applyModule(StormyModule.i18n, () async {
+        if (modules[StormyModule.storage]?.error != null ||
+            !StormyStorage.instance.isInitialized) {
+          throw StateError('i18n 依赖的 storage 未初始化成功');
         }
-
-        final bucketName = (i18n!.storageBucket != null && i18n!.storageBucket!.isNotEmpty)
-            ? i18n!.storageBucket!
+        final config = i18n!;
+        final bucketName = config.storageBucket?.isNotEmpty == true
+            ? config.storageBucket!
             : StormyStorage.instance.currentBucketName;
-
+        final bucket = StormyStorage.instance.bucket(bucketName);
         await StormyI18n.init(
-          defaultLocale: i18n!.defaultLocale,
+          defaultLocale: config.defaultLocale,
           localeResolver: () async {
-            final data = StormyStorage.instance.bucket(bucketName).getString(i18n!.storageKey);
-            if (data != null && data.isNotEmpty) {
-              final parts = data.split('_');
-              return Locale(parts[0], parts.length > 1 ? parts[1] : null);
-            }
-            return null;
+            final data = bucket.getString(config.storageKey);
+            if (data == null || data.isEmpty) return null;
+            final parts = data.split('_');
+            return Locale.fromSubtags(
+              languageCode: parts[0],
+              scriptCode: parts.length > 1 && parts[1].length == 4
+                  ? parts[1]
+                  : null,
+              countryCode: parts.length > 2
+                  ? parts[2]
+                  : parts.length > 1 && parts[1].length != 4
+                  ? parts[1]
+                  : null,
+            );
           },
           onSave: (locale) async {
             if (locale == null) {
-              await StormyStorage.instance.bucket(bucketName).remove(i18n!.storageKey);
+              await bucket.remove(config.storageKey);
             } else {
-              final localeStr = locale.countryCode != null
-                  ? '${locale.languageCode}_${locale.countryCode}'
-                  : locale.languageCode;
-              await StormyStorage.instance.bucket(bucketName).setString(i18n!.storageKey, localeStr);
+              await bucket.setString(config.storageKey, locale.toString());
             }
           },
         );
-        localizationApplied = true;
-      } catch (e) {
-        print('国际化配置应用失败: $e');
-      }
+        StormyConfigAccessor.setI18n(config);
+      });
     }
-
-    return StormyConfigApplied(
-      networkApplied: networkApplied,
-      dialogApplied: dialogApplied,
-      storageApplied: storageApplied,
-      refreshApplied: refreshApplied,
-      themeApplied: themeApplied,
-      localizationApplied: localizationApplied,
-      sdkApplied: sdkApplied,
-    );
+    return StormyConfigApplied(modules);
   }
 }
 
@@ -263,7 +249,8 @@ class StormyConfigBuilder {
     }
 
     if (apply) {
-      await _config.apply();
+      final report = await _config.apply();
+      if (!report.isAllApplied) throw StormyInitializationException(report);
     }
 
     return _config;
@@ -283,32 +270,36 @@ class ConfigurationException implements Exception {
 /// 创建 Stormy 配置构建器
 StormyConfigBuilder stormy() => StormyConfigBuilder();
 
-/// 应用配置结果
-/// 用于存储配置应用后的状态
+enum StormyModule { network, dialog, storage, refresh, theme, i18n }
+
+class ModuleApplyResult {
+  final Object? error;
+  final StackTrace? stackTrace;
+  const ModuleApplyResult.applied() : error = null, stackTrace = null;
+  const ModuleApplyResult.failed(this.error, this.stackTrace);
+  bool get isApplied => error == null;
+}
+
+/// Only configured modules are included; absent modules do not count as failures.
 class StormyConfigApplied {
-  final bool networkApplied;
-  final bool dialogApplied;
-  final bool storageApplied;
-  final bool refreshApplied;
-  final bool themeApplied;
-  final bool localizationApplied;
-  final List<String> sdkApplied;
+  final Map<StormyModule, ModuleApplyResult> modules;
+  StormyConfigApplied(Map<StormyModule, ModuleApplyResult> modules)
+    : modules = Map.unmodifiable(modules);
+  bool _applied(StormyModule module) => modules[module]?.isApplied ?? false;
+  bool get networkApplied => _applied(StormyModule.network);
+  bool get dialogApplied => _applied(StormyModule.dialog);
+  bool get storageApplied => _applied(StormyModule.storage);
+  bool get refreshApplied => _applied(StormyModule.refresh);
+  bool get themeApplied => _applied(StormyModule.theme);
+  bool get localizationApplied => _applied(StormyModule.i18n);
+  List<String> get sdkApplied => const [];
+  bool get isAllApplied => modules.values.every((result) => result.isApplied);
+}
 
-  const StormyConfigApplied({
-    this.networkApplied = false,
-    this.dialogApplied = false,
-    this.storageApplied = false,
-    this.refreshApplied = false,
-    this.themeApplied = false,
-    this.localizationApplied = false,
-    this.sdkApplied = const [],
-  });
-
-  bool get isAllApplied =>
-      networkApplied &&
-      storageApplied &&
-      dialogApplied &&
-      refreshApplied &&
-      themeApplied &&
-      localizationApplied;
+class StormyInitializationException implements Exception {
+  final StormyConfigApplied report;
+  const StormyInitializationException(this.report);
+  @override
+  String toString() =>
+      'StormyInitializationException: ${report.modules.entries.where((e) => !e.value.isApplied).map((e) => '${e.key.name}: ${e.value.error}').join('; ')}';
 }

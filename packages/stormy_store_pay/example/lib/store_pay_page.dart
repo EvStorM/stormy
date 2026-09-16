@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:stormy_store_pay/stormy_store_pay.dart';
 
 import 'main.dart';
+import 'receipt_verifier.dart';
 import 'widgets/log_panel.dart';
 import 'widgets/product_card.dart';
 import 'widgets/product_detail_sheet.dart';
@@ -39,6 +40,7 @@ class _StorePayExamplePageState extends State<StorePayExamplePage> {
   }
 
   void _log(String message) {
+    if (!mounted) return;
     final now = DateTime.now();
     final ts =
         '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
@@ -57,7 +59,36 @@ class _StorePayExamplePageState extends State<StorePayExamplePage> {
   Future<void> _initStorePay() async {
     try {
       _log('初始化支付 SDK...');
-      await StorePayManager.instance.initialize(
+      _subscriptions.add(
+        StorePayManager.instance.purchaseSuccessStream.listen((event) {
+          _log('全局监听-购买/恢复成功: ${event.productId}');
+        }),
+      );
+
+      _subscriptions.add(
+        StorePayManager.instance.purchaseErrorStream.listen((error) {
+          _log('全局监听-购买失败: ${error.message}');
+        }),
+      );
+
+      _subscriptions.add(
+        StorePayManager.instance.productsLoadedStream.listen((products) {
+          _log('加载产品: ${products.length} 个');
+          if (mounted) {
+            setState(() {
+              _products = products;
+            });
+          }
+        }),
+      );
+
+      _subscriptions.add(
+        StorePayManager.instance.purchaseRestoredStream.listen((event) {
+          _log('全局监听-恢复购买完成: ${event.productId}');
+        }),
+      );
+
+      final initialized = await StorePayManager.instance.initialize(
         config: const StorePayConfig(
           autoCompletePurchases: true,
           isForTest: true,
@@ -66,40 +97,17 @@ class _StorePayExamplePageState extends State<StorePayExamplePage> {
             'stormy.store.energy.ten',
           },
         ),
-        verifier: (details) async {
-          _log('验证购买凭证: ${details.productID}');
-          await Future.delayed(const Duration(seconds: 1));
-          return true;
-        },
+        verifier: verifyReceipt,
       );
-
-      _subscriptions.add(StorePayManager.instance.purchaseSuccessStream.listen((event) {
-        _log('全局监听-购买/恢复成功: ${event.productId}');
-      }));
-      
-      _subscriptions.add(StorePayManager.instance.purchaseErrorStream.listen((error) {
-        _log('全局监听-购买失败: ${error.message}');
-      }));
-      
-      _subscriptions.add(StorePayManager.instance.productsLoadedStream.listen((products) {
-        _log('加载产品: ${products.length} 个');
-        if (mounted) {
-          setState(() {
-            _products = products;
-          });
-        }
-      }));
-      
-      _subscriptions.add(StorePayManager.instance.purchaseRestoredStream.listen((event) {
-        _log('全局监听-恢复购买完成: ${event.productId}');
-      }));
-
-      setState(() => _isInitializing = false);
+      if (!mounted) return;
+      if (!initialized)
+        throw StateError(StorePayManager.instance.errorMessage ?? "初始化失败");
+      if (mounted) setState(() => _isInitializing = false);
       _log('初始化完成');
       _queryProducts();
     } catch (e) {
       _log('初始化失败: $e');
-      setState(() => _isInitializing = false);
+      if (mounted) setState(() => _isInitializing = false);
     }
   }
 
@@ -118,13 +126,11 @@ class _StorePayExamplePageState extends State<StorePayExamplePage> {
   Future<void> _purchaseProduct(StoreProductInfo product) async {
     _log('尝试请求购买: ${product.id}');
     try {
-      final success = await StorePayManager.instance.purchaseProduct(product);
-      if (success) {
-        _log('购买请求已发送，等待最终结果...');
-        // 展示一次性监听的使用体验
-        final event = await StorePayManager.instance.waitForPurchase(product.id, timeout: const Duration(minutes: 5));
-        _log('一次性监听-完成交易: ${event.productId}');
-      }
+      final event = await StorePayManager.instance.purchaseAndWait(
+        product,
+        timeout: const Duration(minutes: 5),
+      );
+      _log('一次性监听-完成交易: ${event.productId}');
     } catch (e) {
       _log('购买出现异常: $e');
     }
@@ -247,7 +253,9 @@ class _StorePayExamplePageState extends State<StorePayExamplePage> {
                       : ListView.builder(
                           itemCount: _groupedProducts.length,
                           itemBuilder: (context, index) {
-                            final title = _groupedProducts.keys.elementAt(index);
+                            final title = _groupedProducts.keys.elementAt(
+                              index,
+                            );
                             final items = _groupedProducts[title]!;
 
                             return Column(
@@ -265,17 +273,18 @@ class _StorePayExamplePageState extends State<StorePayExamplePage> {
                                       showModalBottomSheet(
                                         context: context,
                                         isScrollControlled: true,
-                                        backgroundColor:
-                                            Colors.transparent,
-                                        builder:
-                                            (ctx) => ProductDetailSheet(
-                                              product: p,
-                                              onPurchase:
-                                                  (product, offer) {
-                                                Navigator.pop(ctx);
-                                                StorePayManager.instance.purchaseProduct(product, offer: offer);
-                                              },
-                                            ),
+                                        backgroundColor: Colors.transparent,
+                                        builder: (ctx) => ProductDetailSheet(
+                                          product: p,
+                                          onPurchase: (product, offer) {
+                                            Navigator.pop(ctx);
+                                            StorePayManager.instance
+                                                .purchaseProduct(
+                                                  product,
+                                                  offer: offer,
+                                                );
+                                          },
+                                        ),
                                       );
                                     },
                                   ),

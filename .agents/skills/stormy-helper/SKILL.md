@@ -11,12 +11,12 @@ This skill helps developers and AI coding assistants leverage the local foundati
 
 ## 1. Local Packages Overview & Scope
 
-The stormy codebase follows a monorepo structure. Core infrastructure is split into four local Dart packages inside `packages/`:
+The stormy codebase follows a monorepo structure. The workspace has nine packages. Use core for network/storage/preload, platform for native operations, UI for widgets/prompts, and kit for the legacy facade. The i18n runtime is separate from the dev-only generator. See [migration](../../../../docs/MIGRATION.md).
 
 | Package Name | Core Responsibilities | Target Reference File |
 | :--- | :--- | :--- |
 | `stormy_kit` | Core config, Network (Dio), Expiration & Pagination Storage (Hive), Global Dialogs, Downstream Exports. | [references/stormy_kit.md](file:///Volumes/Evils/Documents/github/stormy/.agents/skills/stormy-helper/references/stormy_kit.md) |
-| `stormy_i18n` | Pure Dart strong-typed translation config, dynamic CLI ARB compiler & code generator. | [references/stormy_i18n.md](file:///Volumes/Evils/Documents/github/stormy/.agents/skills/stormy-helper/references/stormy_i18n.md) |
+| `stormy_i18n` | Runtime language state only; CLI belongs to stormy_i18n_generator. | [references/stormy_i18n.md](file:///Volumes/Evils/Documents/github/stormy/.agents/skills/stormy-helper/references/stormy_i18n.md) |
 | `stormy_store_pay` | Google Play and Apple App Store unified in-app purchase (IAP) and subscription SDK. | [references/stormy_store_pay.md](file:///Volumes/Evils/Documents/github/stormy/.agents/skills/stormy-helper/references/stormy_store_pay.md) |
 | `stormy_china_pay` | WeChat & Alipay unified Chinese mainland payment SDK, image sharing, and SSO login. | [references/stormy_china_pay.md](file:///Volumes/Evils/Documents/github/stormy/.agents/skills/stormy-helper/references/stormy_china_pay.md) |
 
@@ -50,13 +50,13 @@ To optimize context token usage, do NOT read all documentation files. Follow thi
 You MUST strictly comply with these development safeguards under all circumstances:
 
 1.  **Do Not Bypass Local Packages:**
-    Never add native flutter integration packages like `dio`, `hive_ce`, `fluwx`, `tobias`, `in_app_purchase`, `easy_refresh`, `flutter_smart_dialog` to custom sub-packages or business features' `pubspec.yaml` directly. Always import `package:stormy_kit/stormy_kit.dart` or resolve additions through the core package.
+    Business features should use the owning Stormy package or the compatible kit main entry. Package implementations declare their actual SDK dependencies. Lower layers must not import kit; china_pay uses core/platform without UI prompts. Add stormy_i18n_generator only to host dev_dependencies.
 2.  **NavigatorKey Requirement:**
-    Always bind `StormyDialog.navigatorKey` in `MaterialApp`'s setup to prevent context-free dialog drawing failures.
+    When using StormyDialog, bind `StormyDialog.navigatorKey` in `MaterialApp`'s setup to prevent context-free dialog drawing failures.
 3.  **No dummy verifiers:**
     Never bypass purchase verification under `stormy_store_pay`. Real backend verification flows must be configured using the `verifier` callbacks.
 4.  **Toast usage:**
-    Prefer `StormyDialog.instance.showToast` over default Flutter Snackbars to prevent layout overlap with keyboards and route blockage.
+    Use `SmartDialog.showToast` (exported by stormy_ui and stormy_kit) over default Flutter Snackbars to prevent layout overlap with keyboards and route blockage.
 
 ---
 

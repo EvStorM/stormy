@@ -1,0 +1,29 @@
+name: stormy_gromore
+description: A Flutter bridge for the China GroMore mediation SDK on Android and iOS.
+version: 0.1.0
+publish_to: none
+resolution: workspace
+homepage: https://github.com/EvStorM/stormy
+repository: https://github.com/EvStorM/stormy/tree/main/packages/stormy_gromore
+
+environment:
+  sdk: ">=3.13.0 <4.0.0"
+  flutter: ">=3.22.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.stormy.gromore
+        pluginClass: StormyGromorePlugin
+      ios:
+        pluginClass: StormyGromorePlugin

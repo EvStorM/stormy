@@ -2,6 +2,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:stormy_china_pay/stormy_china_pay.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('StormyChinaPay', () {
     test('should be a singleton', () {
       final instance1 = StormyChinaPay();

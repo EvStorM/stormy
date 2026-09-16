@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:ui';
+
 import 'package:flutter/widgets.dart';
 
 /// 回调类型：用于从本地持久化中读取语种代码（如 返回 Locale('zh', 'CN')，为 null 表示跟随系统）
@@ -29,7 +30,6 @@ class StormyI18n {
     LocaleSaver? onSave,
     Locale? defaultLocale,
   }) async {
-    _onSave = onSave;
     Locale? resolvedLocale;
     if (localeResolver != null) {
       resolvedLocale = await localeResolver();
@@ -37,6 +37,7 @@ class StormyI18n {
 
     // 如果本地缓存没有返回，则优先使用传入的默认语言
     // 如果没有配置默认语言，则回退为系统的首选语言
+    _onSave = onSave;
     _localeNotifier.value =
         resolvedLocale ?? defaultLocale ?? PlatformDispatcher.instance.locale;
   }

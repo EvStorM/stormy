@@ -1,0 +1,18 @@
+name: stormy_gromore_example
+description: Flutter-side examples for every stormy_gromore ad type.
+publish_to: none
+
+environment:
+  sdk: ">=3.13.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  stormy_gromore:
+    path: ..
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

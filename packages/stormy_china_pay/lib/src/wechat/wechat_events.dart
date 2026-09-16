@@ -6,7 +6,7 @@ import '../models/share_event.dart';
 class WeChatPaymentEvent extends PaymentEvent {
   WeChatPaymentEvent({
     required super.orderInfo,
-    required super.isSuccess,
+    required super.status,
     super.errorCode,
     super.errorMessage,
   });

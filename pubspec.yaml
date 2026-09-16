@@ -1,10 +1,15 @@
 name: stormy_kit_workspace
 publish_to: none
 workspace:
+  - packages/stormy_core
+  - packages/stormy_platform
+  - packages/stormy_ui
+  - packages/stormy_i18n_generator
   - packages/stormy_kit
   - packages/stormy_china_pay
   - packages/stormy_store_pay
   - packages/stormy_i18n
+  - packages/stormy_gromore
 environment:
   sdk: ">=3.13.0 <4.0.0"
 dev_dependencies:

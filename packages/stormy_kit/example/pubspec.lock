@@ -137,22 +137,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.19.1"
-  connectivity_plus:
-    dependency: transitive
-    description:
-      name: connectivity_plus
-      sha256: b8fe52979ff12432ecf8f0abf6ff70410b1bb734be1c9e4f2f86807ad7166c79
-      url: "https://pub.dev"
-    source: hosted
-    version: "7.1.0"
-  connectivity_plus_platform_interface:
-    dependency: transitive
-    description:
-      name: connectivity_plus_platform_interface
-      sha256: "3c09627c536d22fd24691a905cdd8b14520de69da52c7a97499c8be5284a32ed"
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.1.0"
   convert:
     dependency: transitive
     description:
@@ -185,22 +169,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.0.7"
-  cupertino_icons:
-    dependency: transitive
-    description:
-      name: cupertino_icons
-      sha256: "41e005c33bd814be4d3096aff55b1908d419fde52ca656c8c47719ec745873cd"
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.0.9"
-  dbus:
-    dependency: transitive
-    description:
-      name: dbus
-      sha256: d0c98dcd4f5169878b6cf8f6e0a52403a9dff371a3e2f019697accbf6f44a270
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.7.12"
   device_identifier_plugin:
     dependency: transitive
     description:
@@ -812,14 +780,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.17.6"
-  nm:
-    dependency: transitive
-    description:
-      name: nm
-      sha256: "2c9aae4127bdc8993206464fcc063611e0e36e72018696cd9631023a31b24254"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.5.0"
   node_preamble:
     dependency: transitive
     description:
@@ -1052,14 +1012,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.2.1"
-  riverpod_annotation:
-    dependency: transitive
-    description:
-      name: riverpod_annotation
-      sha256: "16471a1260b94e939394d78f1c63a9350936ac4a68c9fbdab40be47268c0b04f"
-      url: "https://pub.dev"
-    source: hosted
-    version: "4.0.2"
   rxdart:
     dependency: transitive
     description:
@@ -1241,10 +1193,24 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.0"
+  stormy_core:
+    dependency: transitive
+    description:
+      path: "../../stormy_core"
+      relative: true
+    source: path
+    version: "0.1.0"
   stormy_i18n:
     dependency: transitive
     description:
       path: "../../stormy_i18n"
+      relative: true
+    source: path
+    version: "0.1.0"
+  stormy_i18n_generator:
+    dependency: "direct dev"
+    description:
+      path: "../../stormy_i18n_generator"
       relative: true
     source: path
     version: "0.1.0"
@@ -1255,6 +1221,20 @@ packages:
       relative: true
     source: path
     version: "1.1.0"
+  stormy_platform:
+    dependency: transitive
+    description:
+      path: "../../stormy_platform"
+      relative: true
+    source: path
+    version: "0.1.0"
+  stormy_ui:
+    dependency: transitive
+    description:
+      path: "../../stormy_ui"
+      relative: true
+    source: path
+    version: "0.1.0"
   stream_channel:
     dependency: transitive
     description:

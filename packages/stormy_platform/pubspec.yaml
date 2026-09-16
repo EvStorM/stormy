@@ -1,0 +1,29 @@
+name: stormy_platform
+description: "Stormy platform package"
+version: 0.1.0
+publish_to: none
+resolution: workspace
+environment:
+  sdk: ^3.13.0
+dependencies:
+  crypto: ^3.0.3
+  device_identifier_plugin: ^1.0.1
+  device_info_plus: ^12.4.0
+  flutter:
+    sdk: flutter
+  flutter_displaymode: ^0.7.0
+  flutter_secure_storage: ^10.0.0
+  gal: ^2.3.2
+  image: ^4.8.0
+  image_picker: ^1.2.1
+  package_info_plus: ^9.0.1
+  path_provider: ^2.1.5
+  permission_handler: ^12.0.1
+  stormy_core:
+    path: ../stormy_core
+  url_launcher: ^6.3.2
+  uuid: ^4.5.3
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter

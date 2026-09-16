@@ -2,9 +2,12 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:fluwx/fluwx.dart';
-import 'package:stormy_kit/stormy_kit.dart';
+import 'package:stormy_core/stormy_core.dart';
+import 'package:stormy_platform/stormy_platform.dart';
+
 import 'wechat_config.dart';
 import 'wechat_events.dart';
+import '../models/payment_event.dart';
 
 /// 微信 SDK 工具类（单例模式）
 ///
@@ -12,13 +15,23 @@ import 'wechat_events.dart';
 /// 使用前需要调用 [init] 方法进行初始化
 class WechatSDK {
   /// 单例实例
-  static final WechatSDK _instance = WechatSDK._internal();
+  static WechatSDK? _instance;
+  static final Fluwx _defaultFluwx = Fluwx();
 
   /// 工厂构造函数
-  factory WechatSDK() => _instance;
+  factory WechatSDK() => _instance ??= WechatSDK.withAdapter(_defaultFluwx);
 
   /// 私有构造函数
-  WechatSDK._internal();
+  WechatSDK.withAdapter(this.fluwx);
+
+  bool _disposed = false;
+  Future<void>? _initialization;
+  Future<void>? _disposal;
+  bool _subscribed = false;
+
+  void _checkActive() {
+    if (_disposed) throw StateError('WechatSDK 已销毁，请获取新实例');
+  }
 
   /// 配置信息
   WechatConfig? _config;
@@ -27,7 +40,7 @@ class WechatSDK {
   bool _isInitialized = false;
 
   /// Fluwx 实例
-  final Fluwx fluwx = Fluwx();
+  final Fluwx fluwx;
 
   /// 当前订单信息
   String? _orderInfo;
@@ -65,33 +78,27 @@ class WechatSDK {
   ///
   /// [config] 配置信息，如果为 null 则使用默认配置
   /// 注册微信 API，初始化 QQ Kit，注册支付回调监听
-  Future<void> init([WechatConfig? config]) async {
-    if (_isInitialized) {
-      StormyLog.i('WechatSDK.init: 已经初始化，跳过');
-      return;
-    }
+  Future<void> init([WechatConfig? config]) {
+    _checkActive();
+    if (_isInitialized) return Future.value();
+    return _initialization ??= _initialize(config).whenComplete(() {
+      _initialization = null;
+    });
+  }
 
+  Future<void> _initialize(WechatConfig? config) async {
     _config = config ?? WechatConfig.defaultConfig();
-
-    try {
-      await fluwx.registerApi(
-        appId: _config!.appId,
-        doOnAndroid: true,
-        doOnIOS: true,
-        universalLink: _config!.universalLink,
-      );
-
-      final isInstalled = await fluwx.isWeChatInstalled;
-      StormyLog.i('WechatSDK.init: 微信安装状态');
-
-      await registerPayResponseListener();
-
-      _isInitialized = true;
-      StormyLog.i('WechatSDK.init: 初始化完成');
-    } catch (e, stackTrace) {
-      StormyLog.e('WechatSDK.init: 初始化失败');
-      rethrow;
-    }
+    final registered = await fluwx.registerApi(
+      appId: _config!.appId,
+      doOnAndroid: true,
+      doOnIOS: true,
+      universalLink: _config!.universalLink,
+    );
+    _checkActive();
+    if (!registered) throw StateError('微信 API 注册失败');
+    await registerPayResponseListener();
+    _checkActive();
+    _isInitialized = true;
   }
 
   /// 微信支付
@@ -101,6 +108,7 @@ class WechatSDK {
   ///
   /// 返回 [bool] 支付请求是否成功发起
   Future<bool> pay(Payment payment, String orderInfo) async {
+    _checkActive();
     if (!_isInitialized) {
       StormyLog.w('WechatSDK.pay: 未初始化，请先调用 init()');
       return false;
@@ -111,6 +119,7 @@ class WechatSDK {
       return false;
     }
 
+    if (_orderInfo != null) throw StateError('微信已有待处理支付');
     try {
       _orderInfo = orderInfo;
       StormyLog.i('WechatSDK.pay: 发起支付');
@@ -118,8 +127,12 @@ class WechatSDK {
       final result = await fluwx.pay(which: payment);
       StormyLog.i('WechatSDK.pay: 支付请求结果');
 
+      _checkActive();
+      if (!result) _orderInfo = null;
       return result;
-    } catch (e, stackTrace) {
+    } catch (e) {
+      _orderInfo = null;
+      _checkActive();
       StormyLog.e('WechatSDK.pay: 支付请求失败');
       return false;
     }
@@ -133,6 +146,7 @@ class WechatSDK {
   ///
   /// 返回 [bool] 是否成功打开小程序
   Future<bool> signPay(String username, String path, String orderInfo) async {
+    _checkActive();
     if (!_isInitialized) {
       StormyLog.w('WechatSDK.signPay: 未初始化，请先调用 init()');
       return false;
@@ -151,6 +165,7 @@ class WechatSDK {
       return false;
     }
 
+    if (_orderInfo != null) throw StateError('微信已有待处理支付');
     try {
       _orderInfo = orderInfo;
       StormyLog.i(
@@ -162,9 +177,12 @@ class WechatSDK {
         target: MiniProgram(username: username, path: path),
       );
 
-      StormyLog.i('WechatSDK.signPay: 打开小程序结果', extra: {'result': result});
+      _checkActive();
+      if (!result) _orderInfo = null;
       return result;
     } catch (e, stackTrace) {
+      _orderInfo = null;
+      _checkActive();
       StormyLog.e(
         'WechatSDK.signPay: 打开小程序失败',
         stackTrace: stackTrace,
@@ -176,6 +194,7 @@ class WechatSDK {
 
   /// 支付响应订阅者
   void _paySubscriber(dynamic response) {
+    if (_disposed) return;
     if (response is WeChatPaymentResponse) {
       _handlePaymentResponse(response);
     } else if (response is WeChatShareResponse) {
@@ -198,13 +217,19 @@ class WechatSDK {
     final errCode = response.errCode;
     final errStr = response.errStr;
 
+    if (_orderInfo == null) return;
     final event = WeChatPaymentEvent(
       orderInfo: _orderInfo ?? '',
-      isSuccess: isSuccessful,
+      status: isSuccessful
+          ? PayStatus.platformSucceeded
+          : errCode == -2
+          ? PayStatus.cancelled
+          : PayStatus.failed,
       errorCode: errCode?.toString(),
       errorMessage: errStr,
     );
 
+    _orderInfo = null;
     _paymentController.add(event);
 
     if (isSuccessful) {
@@ -242,14 +267,6 @@ class WechatSDK {
         'errStr': errStr,
       },
     );
-
-    SmartDialog.dismiss();
-
-    if (isSuccessful) {
-      SmartDialog.showToast("分享成功");
-    } else {
-      SmartDialog.showToast(errStr ?? "分享失败");
-    }
   }
 
   /// 处理小程序启动响应
@@ -263,6 +280,7 @@ class WechatSDK {
       isSuccess: isSuccessful,
     );
 
+    _orderInfo = null;
     _miniProgramController.add(event);
 
     StormyLog.i(
@@ -287,36 +305,23 @@ class WechatSDK {
 
   /// 注册支付回调监听
   Future<void> registerPayResponseListener() async {
-    try {
-      fluwx.addSubscriber(_paySubscriber);
-      StormyLog.i('WechatSDK: 支付回调监听已注册');
-    } catch (e, stackTrace) {
-      StormyLog.e(
-        'WechatSDK.registerPayResponseListener: 注册失败',
-        stackTrace: stackTrace,
-        extra: {'error': e.toString()},
-      );
-    }
+    _checkActive();
+    if (_subscribed) return;
+    fluwx.addSubscriber(_paySubscriber);
+    _subscribed = true;
   }
 
-  /// 移除支付回调监听
   Future<void> removePayResponseListener() async {
-    try {
-      fluwx.removeSubscriber(_paySubscriber);
-      StormyLog.i('WechatSDK: 支付回调监听已移除');
-    } catch (e, stackTrace) {
-      StormyLog.e(
-        'WechatSDK.removePayResponseListener: 移除失败',
-        stackTrace: stackTrace,
-        extra: {'error': e.toString()},
-      );
-    }
+    if (!_subscribed) return;
+    fluwx.removeSubscriber(_paySubscriber);
+    _subscribed = false;
   }
 
   /// 一次性监听支付事件
   StreamSubscription<WeChatPaymentEvent> listenPaymentOnce(
     void Function(WeChatPaymentEvent) callback,
   ) {
+    _checkActive();
     late StreamSubscription<WeChatPaymentEvent> subscription;
     subscription = paymentStream.listen((event) {
       callback(event);
@@ -329,6 +334,7 @@ class WechatSDK {
   StreamSubscription<WeChatShareEvent> listenShareOnce(
     void Function(WeChatShareEvent) callback,
   ) {
+    _checkActive();
     late StreamSubscription<WeChatShareEvent> subscription;
     subscription = shareStream.listen((event) {
       callback(event);
@@ -341,6 +347,7 @@ class WechatSDK {
   StreamSubscription<WeChatLaunchMiniProgramEvent> listenMiniProgramOnce(
     void Function(WeChatLaunchMiniProgramEvent) callback,
   ) {
+    _checkActive();
     late StreamSubscription<WeChatLaunchMiniProgramEvent> subscription;
     subscription = miniProgramStream.listen((event) {
       callback(event);
@@ -353,6 +360,7 @@ class WechatSDK {
   StreamSubscription<WeChatAuthEvent> listenAuthOnce(
     void Function(WeChatAuthEvent) callback,
   ) {
+    _checkActive();
     late StreamSubscription<WeChatAuthEvent> subscription;
     subscription = authStream.listen((event) {
       callback(event);
@@ -371,6 +379,7 @@ class WechatSDK {
     XFile image, {
     WeChatScene scene = WeChatScene.session,
   }) async {
+    _checkActive();
     if (!_isInitialized) {
       StormyLog.w('WechatSDK.shareImage: 未初始化，请先调用 init()');
       return false;
@@ -425,7 +434,10 @@ class WechatSDK {
           ),
         );
 
-        StormyLog.i('WechatSDK.shareImage: iOS 分享结果', extra: {'result': result});
+        StormyLog.i(
+          'WechatSDK.shareImage: iOS 分享结果',
+          extra: {'result': result},
+        );
         return result;
       } else {
         StormyLog.w('WechatSDK.shareImage: 不支持的平台');
@@ -451,6 +463,7 @@ class WechatSDK {
     String imageUrl, {
     WeChatScene scene = WeChatScene.session,
   }) async {
+    _checkActive();
     if (!_isInitialized) {
       StormyLog.w('WechatSDK.shareImageUrl: 未初始化，请先调用 init()');
       return false;
@@ -493,6 +506,7 @@ class WechatSDK {
   ///
   /// 返回 [bool] 是否成功打开小程序
   Future<bool> openMiniProgram(String path, {String? username}) async {
+    _checkActive();
     if (!_isInitialized) {
       StormyLog.w('WechatSDK.openMiniProgram: 未初始化，请先调用 init()');
       return false;
@@ -530,13 +544,19 @@ class WechatSDK {
   }
 
   /// 释放资源
-  Future<void> dispose() async {
-    await removePayResponseListener();
-    await _paymentController.close();
-    await _shareController.close();
-    await _miniProgramController.close();
-    await _authController.close();
+  Future<void> dispose() => _disposal ??= _dispose();
+
+  Future<void> _dispose() async {
+    _disposed = true;
     _isInitialized = false;
-    StormyLog.i('WechatSDK: 资源已释放');
+    _orderInfo = null;
+    if (identical(_instance, this)) _instance = null;
+    await removePayResponseListener();
+    await Future.wait([
+      _paymentController.close(),
+      _shareController.close(),
+      _miniProgramController.close(),
+      _authController.close(),
+    ]);
   }
 }

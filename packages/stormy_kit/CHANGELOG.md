@@ -1,3 +1,10 @@
+## Unreleased
+
+- 保留旧主入口重导出，配置编排委托 core/platform/UI。
+- 仅校验已配置模块及其依赖，apply 返回包含原异常/堆栈的报告，build 在应用失败时抛出 StormyInitializationException。
+
+兼容性与迁移见 [迁移说明](../../docs/MIGRATION.md)。
+
 ## 1.1.0
 - `StormyApp` 现在会等待基础初始化完成，并使用 `AppModel.designSize`
 - `AppModel` 支持配置屏幕方向；传入空列表时由系统管理方向

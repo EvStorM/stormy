@@ -1,23 +1,18 @@
-/// 支付事件基类
+/// Platform progress only. Entitlements must be confirmed by the business server.
+enum PayStatus { launched, pending, platformSucceeded, cancelled, failed }
+
 abstract class PaymentEvent {
-  /// 订单信息
   final String orderInfo;
-
-  /// 是否成功
-  final bool isSuccess;
-
-  /// 是否是签约类型
+  final PayStatus status;
   final bool isSignType;
-
-  /// 错误码
   final String? errorCode;
-
-  /// 错误信息
   final String? errorMessage;
+
+  bool get isSuccess => status == PayStatus.platformSucceeded;
 
   PaymentEvent({
     required this.orderInfo,
-    required this.isSuccess,
+    required this.status,
     this.errorCode,
     this.errorMessage,
     this.isSignType = false,

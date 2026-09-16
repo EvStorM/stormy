@@ -11,7 +11,7 @@ class AlipayPaymentEvent extends PaymentEvent {
 
   AlipayPaymentEvent({
     required super.orderInfo,
-    required super.isSuccess,
+    required super.status,
     super.errorCode,
     super.errorMessage,
     super.isSignType,

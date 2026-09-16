@@ -22,7 +22,7 @@ template_arb_file: app_zh_CN.arb
 output_localization_file: app_localizations.dart
 
 # 支持的地区语言标识列表 (例如 zh_CN, en_US)
-# 当增加新语言时，在此处添加，并重新运行 dart run stormy_i18n gen
+# 当增加新语言时，在此处添加，并重新运行 dart run stormy_i18n_generator gen
 locales:
   - zh_CN
   - zh_TW

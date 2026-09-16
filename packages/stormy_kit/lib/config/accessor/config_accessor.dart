@@ -1,80 +1,32 @@
-import '../config.dart';
-import '../models/i18n_config.dart';
-import '../../core/network/stormy_network.dart';
+import 'package:stormy_core/stormy_core.dart';
+import 'package:stormy_ui/stormy_ui.dart';
+export 'package:stormy_ui/config/accessor/ui_config.dart' show StormyLanguage;
 
-/// 支持的语言枚举
-enum StormyLanguage {
-  /// 中文
-  zhCN('zh', 'CN'),
-
-  /// 英文
-  enUS('en', 'US');
-
-  final String languageCode;
-  final String countryCode;
-
-  const StormyLanguage(this.languageCode, this.countryCode);
-}
-
-/// Config Accessor - 配置访问器
-/// 提供全局配置访问能力，core 模块可从中获取 config 设置的数据
+/// Compatibility facade. State belongs to core and UI respectively.
 class StormyConfigAccessor {
   StormyConfigAccessor._();
-
-  /// 默认网络客户端 (配合 StormyConfigBuilder 使用)
-  static StormyNetworkClient? _networkClient;
-  static StormyNetworkClient? get networkClient => _networkClient;
-
-  /// 主题配置
-  static StormyThemeConfig? _theme;
-  static StormyThemeConfig? get theme => _theme;
-
-  /// 资产配置
-  static StormyAssetsConfig? _assets;
-  static StormyAssetsConfig? get assets => _assets;
-
-  /// 国际化配置
-  static StormyI18nConfig? _i18n;
-  static StormyI18nConfig? get i18n => _i18n;
-
-  /// 当前语言环境
-  static StormyLanguage _currentLanguage = StormyLanguage.zhCN;
-  static StormyLanguage get currentLanguage => _currentLanguage;
-
-  /// 是否已初始化
-  static bool get isInitialized => _theme != null;
-
-  /// 初始化配置
-  /// 供 StormyConfig.apply() 调用
+  static StormyNetworkClient? get networkClient => StormyServices.networkClient;
+  static StormyThemeConfig? get theme => StormyUiConfig.theme;
+  static StormyAssetsConfig? get assets => StormyUiConfig.assets;
+  static StormyI18nConfig? get i18n => StormyUiConfig.i18n;
+  static StormyLanguage get currentLanguage => StormyUiConfig.currentLanguage;
+  static bool get isInitialized => theme != null;
   static void initialize({StormyThemeConfig? theme, StormyI18nConfig? i18n}) {
-    _theme = theme;
-    _i18n = i18n;
+    StormyUiConfig.theme = theme;
+    StormyUiConfig.i18n = i18n;
   }
 
-  /// 设置主题配置
-  static void setTheme(StormyThemeConfig theme) {
-    _theme = theme;
-  }
-
-  /// 设置默认网络客户端
-  static void setNetworkClient(StormyNetworkClient client) {
-    _networkClient = client;
-  }
-
-  /// 设置当前语言环境
-  /// 需在应用初始化时调用，以获取对应语言的翻译
-  static void setLanguage(StormyLanguage language) {
-    _currentLanguage = language;
-  }
-
-  /// 重置配置
-  static void reset() {
-    _theme = null;
-    _currentLanguage = StormyLanguage.zhCN;
-  }
-
-  /// 获取主题色
-  /// 优先使用配置的主题色，无配置则返回默认值
+  static void setI18n(StormyI18nConfig config) => StormyUiConfig.i18n = config;
+  static void setTheme(StormyThemeConfig config) =>
+      StormyUiConfig.theme = config;
+  static void setNetworkClient(StormyNetworkClient client) =>
+      StormyServices.networkClient = client;
+  static void setLanguage(StormyLanguage language) =>
+      StormyUiConfig.currentLanguage = language;
   static int get primaryColorValue =>
-      _theme?.primaryColor?.hashCode ?? 0xFF6366F1;
+      theme?.primaryColor?.toARGB32() ?? 0xFF6366F1;
+  static void reset() {
+    StormyUiConfig.reset();
+    StormyServices.reset();
+  }
 }

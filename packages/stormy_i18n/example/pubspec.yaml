@@ -22,6 +22,8 @@ dependencies:
     sdk: flutter
 
 dev_dependencies:
+  stormy_i18n_generator:
+    path: ../../stormy_i18n_generator
   flutter_driver:
     sdk: flutter
   integration_test:

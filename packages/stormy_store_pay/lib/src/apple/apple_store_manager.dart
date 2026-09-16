@@ -11,14 +11,21 @@ import '../utils/store_product_mapper.dart';
 
 /// Apple App Store 内购管理器实现
 class AppleStoreManager implements StorePayManagerBase {
-  final InAppPurchase _inAppPurchase = InAppPurchase.instance;
+  final InAppPurchase _inAppPurchase;
+  bool _disposed = false;
+  final void Function() _registerPlatform;
   StreamSubscription<List<PurchaseDetails>>? _subscription;
 
   // ========== 配置 ==========
   StorePayConfig _config = StorePayConfig.defaultConfig;
   late final StoreProductMapper _mapper;
 
-  AppleStoreManager() {
+  AppleStoreManager({
+    InAppPurchase? inAppPurchase,
+    void Function()? registerPlatform,
+  }) : _inAppPurchase = inAppPurchase ?? InAppPurchase.instance,
+       _registerPlatform =
+           registerPlatform ?? InAppPurchaseStoreKitPlatform.registerPlatform {
     _mapper = StoreProductMapper(isConsumable: _isConsumableProductById);
   }
 
@@ -93,32 +100,30 @@ class AppleStoreManager implements StorePayManagerBase {
 
   @override
   void setConfig(StorePayConfig config) {
+    if (_disposed) throw StateError("Store manager disposed");
     _config = config;
   }
 
   // ========== 核心方法 ==========
-  Completer<bool>? _initCompleter;
+  Future<bool>? _initialization;
 
   @override
-  Future<bool> initialize() async {
-    if (_statusNotifier.value == IAPStatus.initialized) {
-      debugPrint('[Apple Store] 内购管理器已经初始化，跳过重复初始化');
-      return true;
-    }
+  Future<bool> initialize() {
+    if (_disposed) throw StateError('内购平台实例已销毁');
+    if (isInitialized) return Future.value(true);
+    return _initialization ??= _initializeOnce().whenComplete(
+      () => _initialization = null,
+    );
+  }
 
-    if (_initCompleter != null) {
-      debugPrint('[Apple Store] 内购管理器正在初始化中，等待完成...');
-      return await _initCompleter!.future;
-    }
-
-    _initCompleter = Completer<bool>();
+  Future<bool> _initializeOnce() async {
     _statusNotifier.value = IAPStatus.initializing;
-
     try {
       if (!_validateVerifier()) return false;
 
-      InAppPurchaseStoreKitPlatform.registerPlatform();
+      _registerPlatform();
       _isAvailable = await _inAppPurchase.isAvailable();
+      if (_disposed) return false;
 
       if (!_isAvailable) {
         _setError('Apple Store 内购服务不可用', IAPStatus.initializeFailed);
@@ -126,7 +131,16 @@ class AppleStoreManager implements StorePayManagerBase {
       }
 
       _subscription = _inAppPurchase.purchaseStream.listen(
-        _handlePurchaseUpdates,
+        (updates) {
+          unawaited(
+            _handlePurchaseUpdates(updates).catchError((
+              Object error,
+              StackTrace stack,
+            ) {
+              _notifyPurchaseError(_buildErrorEvent('处理购买事件失败', cause: error));
+            }),
+          );
+        },
         onError: (error) {
           _notifyPurchaseError(
             _buildErrorEvent('购买监听错误: $error', cause: error),
@@ -136,13 +150,11 @@ class AppleStoreManager implements StorePayManagerBase {
 
       _statusNotifier.value = IAPStatus.initialized;
       debugPrint('[Apple Store] 内购管理器初始化成功');
-      _initCompleter?.complete(true);
-      _initCompleter = null;
+
       return true;
     } catch (e) {
       _setError('初始化失败: $e', IAPStatus.initializeFailed);
-      _initCompleter?.complete(false);
-      _initCompleter = null;
+
       return false;
     }
   }
@@ -170,6 +182,7 @@ class AppleStoreManager implements StorePayManagerBase {
         productIds.toSet(),
       );
 
+      if (_disposed) return [];
       if (response.error != null) {
         _notifyPurchaseError(
           _buildErrorEvent(response.error!.message, cause: response.error),
@@ -277,6 +290,7 @@ class AppleStoreManager implements StorePayManagerBase {
     List<StoreProductInfo> products, {
     bool notifyListeners = false,
   }) {
+    if (_disposed) throw StateError("Store manager disposed");
     if (products.isEmpty) return;
 
     for (final product in products) {
@@ -290,11 +304,13 @@ class AppleStoreManager implements StorePayManagerBase {
 
   @override
   StoreProductInfo? getProduct(String unifiedId) {
+    if (_disposed) throw StateError("Store manager disposed");
     return _productCache[unifiedId];
   }
 
   @override
   bool hasPurchased(String nativeProductId) {
+    if (_disposed) throw StateError("Store manager disposed");
     return _purchases.any(
       (purchase) =>
           purchase.productID == nativeProductId &&
@@ -305,11 +321,14 @@ class AppleStoreManager implements StorePayManagerBase {
 
   @override
   void setPurchaseVerifier(PurchaseVerifier? verifier) {
+    if (_disposed) throw StateError("Store manager disposed");
     _purchaseVerifier = verifier;
   }
 
   @override
   void dispose() {
+    if (_disposed) return;
+    _disposed = true;
     _subscription?.cancel();
     _statusNotifier.dispose();
     _isLoadingNotifier.dispose();
@@ -325,6 +344,7 @@ class AppleStoreManager implements StorePayManagerBase {
 
   // ========== 内部通知方法 ==========
   void _notifyPurchaseEvent(IAPPurchaseEvent event) {
+    if (_disposed) return;
     _purchaseSuccessController.add(event);
 
     if (event.isRestored) {
@@ -333,10 +353,12 @@ class AppleStoreManager implements StorePayManagerBase {
   }
 
   void _notifyPurchaseError(IAPPurchaseErrorEvent errorEvent) {
+    if (_disposed) return;
     _purchaseErrorController.add(errorEvent);
   }
 
   void _notifyProductsLoaded(List<StoreProductInfo> products) {
+    if (_disposed) return;
     _productsLoadedController.add(products);
   }
 
@@ -373,6 +395,7 @@ class AppleStoreManager implements StorePayManagerBase {
 
   // ========== 内部验证方法 ==========
   bool _checkInitialized() {
+    if (_disposed) throw StateError('内购平台实例已销毁');
     if (!isInitialized) {
       _errorMessage = '内购管理器未初始化，请先调用 initialize()';
       _notifyPurchaseError(_buildErrorEvent(_errorMessage!));
@@ -410,6 +433,7 @@ class AppleStoreManager implements StorePayManagerBase {
     List<PurchaseDetails> purchaseDetailsList,
   ) async {
     for (final PurchaseDetails purchaseDetails in purchaseDetailsList) {
+      if (_disposed) return;
       if (purchaseDetails.status == PurchaseStatus.pending) {
         debugPrint('[Apple Store] 购买进行中: ${purchaseDetails.productID}');
         continue;
@@ -449,6 +473,7 @@ class AppleStoreManager implements StorePayManagerBase {
           verified = false;
         }
 
+        if (_disposed) return;
         if (verified) {
           await _handleCompletedPurchase(
             purchaseDetails,
@@ -457,7 +482,8 @@ class AppleStoreManager implements StorePayManagerBase {
                 : IAPPurchaseLifecycle.restored,
           );
 
-          if (_config.autoCompletePurchases &&
+          if (!_disposed &&
+              _config.autoCompletePurchases &&
               purchaseDetails.pendingCompletePurchase) {
             await _inAppPurchase.completePurchase(purchaseDetails);
           }
@@ -555,17 +581,19 @@ class AppleStoreManager implements StorePayManagerBase {
   }
 
   void _setError(String message, IAPStatus status) {
+    if (_disposed) return;
     _errorMessage = message;
     _statusNotifier.value = status;
     debugPrint('[Apple Store] $_errorMessage');
   }
 
   Future<T> _runWithLoading<T>(Future<T> Function() runner) async {
+    if (_disposed) throw StateError('内购平台实例已销毁');
     _isLoadingNotifier.value = true;
     try {
       return await runner();
     } finally {
-      _isLoadingNotifier.value = false;
+      if (!_disposed) _isLoadingNotifier.value = false;
     }
   }
 }

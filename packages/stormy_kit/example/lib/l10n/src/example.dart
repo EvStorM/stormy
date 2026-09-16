@@ -2,14 +2,15 @@ import '../stormy_i18n.dart';
 
 class ExampleTranslations {
   static const badge = I18nItem(
-    zhCN: '角标',
-    enUS: 'Badge',
+    zh_CN: '角标',
+    en_US: 'Badge',
   );
 
   static const nWombats = I18nItem(
     description: 'A plural message',
-    zhCN: '{count, plural, =0{没有袋熊} =1{1只袋熊} other{{count}只袋熊}}',
-    enUS: '{count, plural, =0{no wombats} =1{1 wombat} other{{count} wombats}}',
+    zh_CN: '{count, plural, =0{没有袋熊} =1{1只袋熊} other{{count}只袋熊}}',
+    en_US:
+        '{count, plural, =0{no wombats} =1{1 wombat} other{{count} wombats}}',
     placeholders: {
       'count': I18nPlaceholder.int(format: 'compact'),
     },
@@ -17,8 +18,8 @@ class ExampleTranslations {
 
   static const pronoun = I18nItem(
     description: 'A gendered message',
-    zhCN: '{gender, select, male{他} female{她} other{他/她}}',
-    enUS: '{gender, select, male{he} female{she} other{they}}',
+    zh_CN: '{gender, select, male{他} female{她} other{他/她}}',
+    en_US: '{gender, select, male{he} female{she} other{they}}',
     placeholders: {
       'gender': I18nPlaceholder.string(),
     },
@@ -26,8 +27,8 @@ class ExampleTranslations {
 
   static const money = I18nItem(
     description: 'A message with a formatted int parameter',
-    zhCN: '商品价格: {value}',
-    enUS: 'Price: {value}',
+    zh_CN: '商品价格: {value}',
+    en_US: 'Price: {value}',
     placeholders: {
       'value': I18nPlaceholder.intCompactCurrency(
         decimalDigits: 2,
@@ -37,9 +38,9 @@ class ExampleTranslations {
 
   static const helloWorldOn = I18nItem(
     description: 'A message with a date parameter',
-    zhCN:
+    zh_CN:
         '{date}:{time} 您好, {name}, {gender, select, male{他} female{她} other{他/她}}已经有{count}个未读消息',
-    enUS:
+    en_US:
         ' {name} Hello World on {date}:{time}, {gender, select, male{he} female{she} other{they}} have {count} unread {count, plural, =1{message} other{messages}}',
     placeholders: {
       'date': I18nPlaceholder.dateTime(format: 'yMd'),

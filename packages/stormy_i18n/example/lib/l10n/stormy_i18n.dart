@@ -46,8 +46,7 @@ class I18nPlaceholder {
     int? decimalDigits,
   }) : this._(type: 'int', format: 'compactSimpleCurrency');
 
-  const I18nPlaceholder.intCompactLong()
-      : this._(type: 'int', format: 'compactLong');
+  const I18nPlaceholder.intCompactLong() : this._(type: 'int', format: 'compactLong');
 
   const I18nPlaceholder.intCurrency({
     String? name,
@@ -56,8 +55,7 @@ class I18nPlaceholder {
     String? customPattern,
   }) : this._(type: 'int', format: 'currency');
 
-  const I18nPlaceholder.intDecimalPattern()
-      : this._(type: 'int', format: 'decimalPattern');
+  const I18nPlaceholder.intDecimalPattern() : this._(type: 'int', format: 'decimalPattern');
 
   const I18nPlaceholder.intDecimalPatternDigits({
     int? decimalDigits,
@@ -67,11 +65,9 @@ class I18nPlaceholder {
     int? decimalDigits,
   }) : this._(type: 'int', format: 'decimalPercentPattern');
 
-  const I18nPlaceholder.intPercentPattern()
-      : this._(type: 'int', format: 'percentPattern');
+  const I18nPlaceholder.intPercentPattern() : this._(type: 'int', format: 'percentPattern');
 
-  const I18nPlaceholder.intScientificPattern()
-      : this._(type: 'int', format: 'scientificPattern');
+  const I18nPlaceholder.intScientificPattern() : this._(type: 'int', format: 'scientificPattern');
 
   const I18nPlaceholder.intSimpleCurrency({
     String? name,
@@ -130,17 +126,19 @@ extension StormyL10nExtension on BuildContext {
     }
     return localizations;
   }
+
 }
 
 /// [StormyLocales] 提供了精确的 [Locale] 定义。
 /// 使用了高级本地化标志（如包含 scriptCode 与 countryCode），确保了真正的国家/地区分离及高精度匹配。
 class StormyLocales {
-  static const Locale zh_CN =
-      Locale.fromSubtags(languageCode: 'zh', countryCode: 'CN');
-  static const Locale zh_TW =
-      Locale.fromSubtags(languageCode: 'zh', countryCode: 'TW');
-  static const Locale en_US =
-      Locale.fromSubtags(languageCode: 'en', countryCode: 'US');
+  static const Locale zh_CN = Locale.fromSubtags(languageCode: 'zh', countryCode: 'CN');
+  static const Locale zh_TW = Locale.fromSubtags(languageCode: 'zh', countryCode: 'TW');
+  static const Locale en_US = Locale.fromSubtags(languageCode: 'en', countryCode: 'US');
 
-  static const List<Locale> supportedLocales = [zh_CN, zh_TW, en_US];
+  static const List<Locale> supportedLocales = [
+    zh_CN,
+    zh_TW,
+    en_US
+  ];
 }

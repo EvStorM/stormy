@@ -67,7 +67,7 @@ class _BasicStorageTabState extends State<_BasicStorageTab> {
   final _keyController = TextEditingController();
   final _valueController = TextEditingController();
   String? _currentBucketName;
-  List<MapEntry<String, dynamic>> _entries = [];
+  List<MapEntry<Object, dynamic>> _entries = [];
 
   @override
   void initState() {
@@ -274,7 +274,7 @@ class _BasicStorageTabState extends State<_BasicStorageTab> {
                       return ListTile(
                         dense: true,
                         title: Text(
-                          entry.key,
+                          entry.key.toString(),
                           style: theme.textTheme.bodyMedium?.copyWith(
                             fontWeight: FontWeight.w600,
                           ),
